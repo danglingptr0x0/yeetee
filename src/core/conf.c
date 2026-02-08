@@ -16,7 +16,7 @@
 #define YT_CONF_FILENAME "config"
 #define YT_CONF_SUBDIR "/yeetee"
 
-#define YT_CONF_DEFAULT_CLIENT_ID     "861556708454-d6dlm3lh05idd8npek18k6be8ba3oc68.apps.googleusercontent.com"
+#define YT_CONF_DEFAULT_CLIENT_ID "861556708454-d6dlm3lh05idd8npek18k6be8ba3oc68.apps.googleusercontent.com"
 #define YT_CONF_DEFAULT_CLIENT_SECRET "SboVhoG9s0rNafixCSGGKXAT"
 
 static uint32_t conf_dir_build(char *dst, size_t dst_size, const char *env_name, const char *fallback_suffix)
