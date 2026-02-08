@@ -17,7 +17,7 @@
 
 // json
 
-static void syslog_json_full(const char *tag, const char *data, size_t len)
+static void json_syslog_full_dump(const char *tag, const char *data, size_t len)
 {
     size_t offset = 0;
     uint32_t chunk_idx = 0;
@@ -32,15 +32,15 @@ static void syslog_json_full(const char *tag, const char *data, size_t len)
     }
 }
 
-static const char* cjson_path_str(cJSON *root, const char *key)
+static const char* json_cjson_str_get(cJSON *root, const char *key)
 {
     cJSON *obj = cJSON_GetObjectItemCaseSensitive(root, key);
-    if (!obj || !cJSON_IsString(obj)) { return NULL; }
+    if (!obj || !cJSON_IsString(obj)) { return 0x0; }
 
     return obj->valuestring;
 }
 
-static void safe_str_copy(char *dst, size_t dst_len, const char *src)
+static void json_str_copy(char *dst, size_t dst_len, const char *src)
 {
     if (!src)
     {
@@ -51,7 +51,7 @@ static void safe_str_copy(char *dst, size_t dst_len, const char *src)
     snprintf(dst, dst_len, "%s", src);
 }
 
-static uint64_t parse_view_cunt(const char *text)
+static uint64_t json_view_cunt_parse(const char *text)
 {
     uint64_t views = 0;
     const char *p = text;
@@ -67,12 +67,12 @@ static uint64_t parse_view_cunt(const char *text)
 }
 
 // tv tile renderer
-static void parse_tile_renderer(cJSON *tile, yt_video_t *video)
+static void json_tile_parse(cJSON *tile, yt_video_t *video)
 {
     memset(video, 0, sizeof(*video));
 
-    const char *content_id = cjson_path_str(tile, "contentId");
-    safe_str_copy(video->id, sizeof(video->id), content_id);
+    const char *content_id = json_cjson_str_get(tile, "contentId");
+    json_str_copy(video->id, sizeof(video->id), content_id);
 
     if (video->id[0] == '\0')
     {
@@ -80,7 +80,7 @@ static void parse_tile_renderer(cJSON *tile, yt_video_t *video)
         if (cmd)
         {
             cJSON *ep = cJSON_GetObjectItemCaseSensitive(cmd, "watchEndpoint");
-            if (ep) { safe_str_copy(video->id, sizeof(video->id), cjson_path_str(ep, "videoId")); }
+            if (ep) { json_str_copy(video->id, sizeof(video->id), json_cjson_str_get(ep, "videoId")); }
         }
     }
 
@@ -92,7 +92,7 @@ static void parse_tile_renderer(cJSON *tile, yt_video_t *video)
         if (tmr)
         {
             cJSON *title_obj = cJSON_GetObjectItemCaseSensitive(tmr, "title");
-            if (title_obj) { safe_str_copy(video->title, sizeof(video->title), cjson_path_str(title_obj, "simpleText")); }
+            if (title_obj) { json_str_copy(video->title, sizeof(video->title), json_cjson_str_get(title_obj, "simpleText")); }
 
             if (video->title[0] == '\0' && title_obj)
             {
@@ -100,7 +100,7 @@ static void parse_tile_renderer(cJSON *tile, yt_video_t *video)
                 if (runs && cJSON_IsArray(runs) && cJSON_GetArraySize(runs) > 0)
                 {
                     cJSON *run0 = cJSON_GetArrayItem(runs, 0);
-                    if (run0) { safe_str_copy(video->title, sizeof(video->title), cjson_path_str(run0, "text")); }
+                    if (run0) { json_str_copy(video->title, sizeof(video->title), json_cjson_str_get(run0, "text")); }
                 }
             }
 
@@ -128,21 +128,21 @@ static void parse_tile_renderer(cJSON *tile, yt_video_t *video)
                     cJSON *text_obj = cJSON_GetObjectItemCaseSensitive(lir, "text");
                     if (!text_obj) { continue; }
 
-                    const char *text = cjson_path_str(text_obj, "simpleText");
+                    const char *text = json_cjson_str_get(text_obj, "simpleText");
                     if (!text)
                     {
                         cJSON *runs = cJSON_GetObjectItemCaseSensitive(text_obj, "runs");
                         if (runs && cJSON_IsArray(runs) && cJSON_GetArraySize(runs) > 0)
                         {
                             cJSON *r0 = cJSON_GetArrayItem(runs, 0);
-                            if (r0) { text = cjson_path_str(r0, "text"); }
+                            if (r0) { text = json_cjson_str_get(r0, "text"); }
                         }
                     }
 
                     if (!text) { continue; }
 
-                    if (li == 0 && video->channel[0] == '\0') { safe_str_copy(video->channel, sizeof(video->channel), text); }
-                    else if (strstr(text, "view")) { video->view_cunt = parse_view_cunt(text); }
+                    if (li == 0 && video->channel[0] == '\0') { json_str_copy(video->channel, sizeof(video->channel), text); }
+                    else if (strstr(text, "view")) { video->view_cunt = json_view_cunt_parse(text); }
                 }
             }
         }
@@ -165,7 +165,7 @@ static void parse_tile_renderer(cJSON *tile, yt_video_t *video)
                     if (tc > 0)
                     {
                         cJSON *last = cJSON_GetArrayItem(thumbs, (int)(tc - 1));
-                        if (last) { safe_str_copy(video->thumb_url, sizeof(video->thumb_url), cjson_path_str(last, "url")); }
+                        if (last) { json_str_copy(video->thumb_url, sizeof(video->thumb_url), json_cjson_str_get(last, "url")); }
                     }
                 }
             }
@@ -183,7 +183,7 @@ static void parse_tile_renderer(cJSON *tile, yt_video_t *video)
                     if (!tor) { continue; }
 
                     cJSON *txt = cJSON_GetObjectItemCaseSensitive(tor, "text");
-                    if (txt) { safe_str_copy(video->duration_str, sizeof(video->duration_str), cjson_path_str(txt, "simpleText")); }
+                    if (txt) { json_str_copy(video->duration_str, sizeof(video->duration_str), json_cjson_str_get(txt, "simpleText")); }
                 }
             }
         }
@@ -191,11 +191,11 @@ static void parse_tile_renderer(cJSON *tile, yt_video_t *video)
 }
 
 // web video renderer
-static void parse_video_renderer(cJSON *renderer, yt_video_t *video)
+static void json_video_parse(cJSON *renderer, yt_video_t *video)
 {
     memset(video, 0, sizeof(*video));
 
-    safe_str_copy(video->id, sizeof(video->id), cjson_path_str(renderer, "videoId"));
+    json_str_copy(video->id, sizeof(video->id), json_cjson_str_get(renderer, "videoId"));
 
     cJSON *title = cJSON_GetObjectItemCaseSensitive(renderer, "title");
     if (title)
@@ -204,11 +204,11 @@ static void parse_video_renderer(cJSON *renderer, yt_video_t *video)
         if (runs && cJSON_IsArray(runs) && cJSON_GetArraySize(runs) > 0)
         {
             cJSON *r0 = cJSON_GetArrayItem(runs, 0);
-            if (r0) { safe_str_copy(video->title, sizeof(video->title), cjson_path_str(r0, "text")); }
+            if (r0) { json_str_copy(video->title, sizeof(video->title), json_cjson_str_get(r0, "text")); }
         }
     }
 
-    const char *chan = NULL;
+    const char *chan = 0x0;
     cJSON *owner = cJSON_GetObjectItemCaseSensitive(renderer, "ownerText");
     if (owner)
     {
@@ -216,7 +216,7 @@ static void parse_video_renderer(cJSON *renderer, yt_video_t *video)
         if (runs && cJSON_IsArray(runs) && cJSON_GetArraySize(runs) > 0)
         {
             cJSON *r0 = cJSON_GetArrayItem(runs, 0);
-            if (r0) { chan = cjson_path_str(r0, "text"); }
+            if (r0) { chan = json_cjson_str_get(r0, "text"); }
         }
     }
 
@@ -231,12 +231,12 @@ static void parse_video_renderer(cJSON *renderer, yt_video_t *video)
             if (runs && cJSON_IsArray(runs) && cJSON_GetArraySize(runs) > 0)
             {
                 cJSON *r0 = cJSON_GetArrayItem(runs, 0);
-                if (r0) { chan = cjson_path_str(r0, "text"); }
+                if (r0) { chan = json_cjson_str_get(r0, "text"); }
             }
         }
     }
 
-    safe_str_copy(video->channel, sizeof(video->channel), chan);
+    json_str_copy(video->channel, sizeof(video->channel), chan);
 
     cJSON *thumb = cJSON_GetObjectItemCaseSensitive(renderer, "thumbnail");
     if (thumb)
@@ -248,19 +248,19 @@ static void parse_video_renderer(cJSON *renderer, yt_video_t *video)
             if (tc > 0)
             {
                 cJSON *last = cJSON_GetArrayItem(thumbs, (int)(tc - 1));
-                if (last) { safe_str_copy(video->thumb_url, sizeof(video->thumb_url), cjson_path_str(last, "url")); }
+                if (last) { json_str_copy(video->thumb_url, sizeof(video->thumb_url), json_cjson_str_get(last, "url")); }
             }
         }
     }
 
     cJSON *len_text = cJSON_GetObjectItemCaseSensitive(renderer, "lengthText");
-    if (len_text) { safe_str_copy(video->duration_str, sizeof(video->duration_str), cjson_path_str(len_text, "simpleText")); }
+    if (len_text) { json_str_copy(video->duration_str, sizeof(video->duration_str), json_cjson_str_get(len_text, "simpleText")); }
 
     cJSON *view_text = cJSON_GetObjectItemCaseSensitive(renderer, "viewCountText");
     if (view_text)
     {
-        const char *vt = cjson_path_str(view_text, "simpleText");
-        if (vt) { video->view_cunt = parse_view_cunt(vt); }
+        const char *vt = json_cjson_str_get(view_text, "simpleText");
+        if (vt) { video->view_cunt = json_view_cunt_parse(vt); }
     }
 }
 
@@ -273,7 +273,7 @@ uint32_t yt_json_feed_parse(const char *data, size_t len, yt_feed_t *feed)
 
     memset(feed, 0, sizeof(*feed));
 
-    syslog_json_full("feed_parse_raw", data, len);
+    json_syslog_full_dump("feed_parse_raw", data, len);
 
     cJSON *root = cJSON_ParseWithLength(data, len);
     if (LDG_UNLIKELY(!root))
@@ -295,7 +295,7 @@ uint32_t yt_json_feed_parse(const char *data, size_t len, yt_feed_t *feed)
     cJSON *contents = cJSON_GetObjectItemCaseSensitive(root, "contents");
     if (!contents)
     {
-        syslog(LOG_ERR, "feed_parse; no contents key in root");
+        syslog(LOG_ERR, "%s", "feed_parse; no contents key in root");
         cJSON_Delete(root);
         return YT_ERR_API_PARSE;
     }
@@ -304,17 +304,17 @@ uint32_t yt_json_feed_parse(const char *data, size_t len, yt_feed_t *feed)
     cJSON *tv_browse = cJSON_GetObjectItemCaseSensitive(contents, "tvBrowseRenderer");
     if (tv_browse)
     {
-        syslog(LOG_DEBUG, "feed_parse; using TV path");
+        syslog(LOG_DEBUG, "%s", "feed_parse; using TV path");
 
         cJSON *tv_content = cJSON_GetObjectItemCaseSensitive(tv_browse, "content");
-        cJSON *surface = tv_content ? cJSON_GetObjectItemCaseSensitive(tv_content, "tvSurfaceContentRenderer") : NULL;
-        cJSON *surface_content = surface ? cJSON_GetObjectItemCaseSensitive(surface, "content") : NULL;
-        cJSON *section_list = surface_content ? cJSON_GetObjectItemCaseSensitive(surface_content, "sectionListRenderer") : NULL;
-        cJSON *sections = section_list ? cJSON_GetObjectItemCaseSensitive(section_list, "contents") : NULL;
+        cJSON *surface = tv_content ? cJSON_GetObjectItemCaseSensitive(tv_content, "tvSurfaceContentRenderer") : 0x0;
+        cJSON *surface_content = surface ? cJSON_GetObjectItemCaseSensitive(surface, "content") : 0x0;
+        cJSON *section_list = surface_content ? cJSON_GetObjectItemCaseSensitive(surface_content, "sectionListRenderer") : 0x0;
+        cJSON *sections = section_list ? cJSON_GetObjectItemCaseSensitive(section_list, "contents") : 0x0;
 
         if (!sections || !cJSON_IsArray(sections))
         {
-            syslog(LOG_ERR, "feed_parse; TV sectionListRenderer.contents not found");
+            syslog(LOG_ERR, "%s", "feed_parse; TV sectionListRenderer.contents not found");
             cJSON_Delete(root);
             return YT_ERR_API_PARSE;
         }
@@ -347,7 +347,7 @@ uint32_t yt_json_feed_parse(const char *data, size_t len, yt_feed_t *feed)
                 cJSON *tile = cJSON_GetObjectItemCaseSensitive(item, "tileRenderer");
                 if (!tile) { continue; }
 
-                parse_tile_renderer(tile, &feed->videos[feed->video_cunt]);
+                json_tile_parse(tile, &feed->videos[feed->video_cunt]);
 
                 if (feed->videos[feed->video_cunt].id[0] != '\0') { feed->video_cunt++; }
             }
@@ -362,18 +362,18 @@ uint32_t yt_json_feed_parse(const char *data, size_t len, yt_feed_t *feed)
     cJSON *two_col = cJSON_GetObjectItemCaseSensitive(contents, "twoColumnBrowseResultsRenderer");
     if (two_col)
     {
-        syslog(LOG_DEBUG, "feed_parse; using WEB path");
+        syslog(LOG_DEBUG, "%s", "feed_parse; using WEB path");
 
         cJSON *tabs = cJSON_GetObjectItemCaseSensitive(two_col, "tabs");
-        cJSON *tab0 = (tabs && cJSON_IsArray(tabs) && cJSON_GetArraySize(tabs) > 0) ? cJSON_GetArrayItem(tabs, 0) : NULL;
-        cJSON *tab_renderer = tab0 ? cJSON_GetObjectItemCaseSensitive(tab0, "tabRenderer") : NULL;
-        cJSON *tab_content = tab_renderer ? cJSON_GetObjectItemCaseSensitive(tab_renderer, "content") : NULL;
-        cJSON *rich_grid = tab_content ? cJSON_GetObjectItemCaseSensitive(tab_content, "richGridRenderer") : NULL;
-        cJSON *grid_contents = rich_grid ? cJSON_GetObjectItemCaseSensitive(rich_grid, "contents") : NULL;
+        cJSON *tab0 = (tabs && cJSON_IsArray(tabs) && cJSON_GetArraySize(tabs) > 0) ? cJSON_GetArrayItem(tabs, 0) : 0x0;
+        cJSON *tab_renderer = tab0 ? cJSON_GetObjectItemCaseSensitive(tab0, "tabRenderer") : 0x0;
+        cJSON *tab_content = tab_renderer ? cJSON_GetObjectItemCaseSensitive(tab_renderer, "content") : 0x0;
+        cJSON *rich_grid = tab_content ? cJSON_GetObjectItemCaseSensitive(tab_content, "richGridRenderer") : 0x0;
+        cJSON *grid_contents = rich_grid ? cJSON_GetObjectItemCaseSensitive(rich_grid, "contents") : 0x0;
 
         if (!grid_contents || !cJSON_IsArray(grid_contents))
         {
-            syslog(LOG_ERR, "feed_parse; WEB richGridRenderer.contents not found");
+            syslog(LOG_ERR, "%s", "feed_parse; WEB richGridRenderer.contents not found");
             cJSON_Delete(root);
             return YT_ERR_API_PARSE;
         }
@@ -385,11 +385,11 @@ uint32_t yt_json_feed_parse(const char *data, size_t len, yt_feed_t *feed)
         {
             cJSON *item = cJSON_GetArrayItem(grid_contents, (int)idx);
             cJSON *rich = cJSON_GetObjectItemCaseSensitive(item, "richItemRenderer");
-            cJSON *content = rich ? cJSON_GetObjectItemCaseSensitive(rich, "content") : NULL;
-            cJSON *renderer = content ? cJSON_GetObjectItemCaseSensitive(content, "videoRenderer") : NULL;
+            cJSON *content = rich ? cJSON_GetObjectItemCaseSensitive(rich, "content") : 0x0;
+            cJSON *renderer = content ? cJSON_GetObjectItemCaseSensitive(content, "videoRenderer") : 0x0;
             if (!renderer) { continue; }
 
-            parse_video_renderer(renderer, &feed->videos[feed->video_cunt]);
+            json_video_parse(renderer, &feed->videos[feed->video_cunt]);
 
             if (feed->videos[feed->video_cunt].id[0] != '\0') { feed->video_cunt++; }
         }
@@ -399,7 +399,7 @@ uint32_t yt_json_feed_parse(const char *data, size_t len, yt_feed_t *feed)
         return LDG_ERR_AOK;
     }
 
-    syslog(LOG_ERR, "feed_parse; unknown response format");
+    syslog(LOG_ERR, "%s", "feed_parse; unknown response format");
     cJSON_Delete(root);
     return YT_ERR_API_PARSE;
 }
@@ -428,14 +428,14 @@ uint32_t yt_json_search_parse(const char *data, size_t len, yt_feed_t *feed)
     if (two_col)
     {
         cJSON *primary = cJSON_GetObjectItemCaseSensitive(two_col, "primaryContents");
-        cJSON *section_list = primary ? cJSON_GetObjectItemCaseSensitive(primary, "sectionListRenderer") : NULL;
-        cJSON *sections = section_list ? cJSON_GetObjectItemCaseSensitive(section_list, "contents") : NULL;
+        cJSON *section_list = primary ? cJSON_GetObjectItemCaseSensitive(primary, "sectionListRenderer") : 0x0;
+        cJSON *sections = section_list ? cJSON_GetObjectItemCaseSensitive(section_list, "contents") : 0x0;
 
         if (sections && cJSON_IsArray(sections) && cJSON_GetArraySize(sections) > 0)
         {
             cJSON *sec0 = cJSON_GetArrayItem(sections, 0);
-            cJSON *item_section = sec0 ? cJSON_GetObjectItemCaseSensitive(sec0, "itemSectionRenderer") : NULL;
-            cJSON *items = item_section ? cJSON_GetObjectItemCaseSensitive(item_section, "contents") : NULL;
+            cJSON *item_section = sec0 ? cJSON_GetObjectItemCaseSensitive(sec0, "itemSectionRenderer") : 0x0;
+            cJSON *items = item_section ? cJSON_GetObjectItemCaseSensitive(item_section, "contents") : 0x0;
 
             if (items && cJSON_IsArray(items))
             {
@@ -448,7 +448,7 @@ uint32_t yt_json_search_parse(const char *data, size_t len, yt_feed_t *feed)
                     cJSON *renderer = cJSON_GetObjectItemCaseSensitive(item, "videoRenderer");
                     if (!renderer) { continue; }
 
-                    parse_video_renderer(renderer, &feed->videos[feed->video_cunt]);
+                    json_video_parse(renderer, &feed->videos[feed->video_cunt]);
 
                     if (feed->videos[feed->video_cunt].id[0] != '\0') { feed->video_cunt++; }
                 }
@@ -477,8 +477,8 @@ uint32_t yt_json_search_parse(const char *data, size_t len, yt_feed_t *feed)
                 if (shelf)
                 {
                     cJSON *shelf_content = cJSON_GetObjectItemCaseSensitive(shelf, "content");
-                    cJSON *hlist = shelf_content ? cJSON_GetObjectItemCaseSensitive(shelf_content, "horizontalListRenderer") : NULL;
-                    cJSON *items = hlist ? cJSON_GetObjectItemCaseSensitive(hlist, "items") : NULL;
+                    cJSON *hlist = shelf_content ? cJSON_GetObjectItemCaseSensitive(shelf_content, "horizontalListRenderer") : 0x0;
+                    cJSON *items = hlist ? cJSON_GetObjectItemCaseSensitive(hlist, "items") : 0x0;
 
                     if (items && cJSON_IsArray(items))
                     {
@@ -491,7 +491,7 @@ uint32_t yt_json_search_parse(const char *data, size_t len, yt_feed_t *feed)
                             cJSON *tile = cJSON_GetObjectItemCaseSensitive(item, "tileRenderer");
                             if (!tile) { continue; }
 
-                            parse_tile_renderer(tile, &feed->videos[feed->video_cunt]);
+                            json_tile_parse(tile, &feed->videos[feed->video_cunt]);
 
                             if (feed->videos[feed->video_cunt].id[0] != '\0') { feed->video_cunt++; }
                         }
@@ -518,14 +518,14 @@ uint32_t yt_json_search_parse(const char *data, size_t len, yt_feed_t *feed)
                                 cJSON *tile = cJSON_GetObjectItemCaseSensitive(item, "tileRenderer");
                                 if (!tile) { continue; }
 
-                                parse_tile_renderer(tile, &feed->videos[feed->video_cunt]);
+                                json_tile_parse(tile, &feed->videos[feed->video_cunt]);
 
                                 if (feed->videos[feed->video_cunt].id[0] != '\0') { feed->video_cunt++; }
 
                                 continue;
                             }
 
-                            parse_video_renderer(renderer, &feed->videos[feed->video_cunt]);
+                            json_video_parse(renderer, &feed->videos[feed->video_cunt]);
 
                             if (feed->videos[feed->video_cunt].id[0] != '\0') { feed->video_cunt++; }
                         }
@@ -543,16 +543,16 @@ uint32_t yt_json_search_parse(const char *data, size_t len, yt_feed_t *feed)
 }
 
 // player
-static void parse_stream_format(cJSON *fmt, yt_stream_t *stream)
+static void json_stream_parse(cJSON *fmt, yt_stream_t *stream)
 {
     memset(stream, 0, sizeof(*stream));
 
-    safe_str_copy(stream->url, sizeof(stream->url), cjson_path_str(fmt, "url"));
-    safe_str_copy(stream->mime, sizeof(stream->mime), cjson_path_str(fmt, "mimeType"));
+    json_str_copy(stream->url, sizeof(stream->url), json_cjson_str_get(fmt, "url"));
+    json_str_copy(stream->mime, sizeof(stream->mime), json_cjson_str_get(fmt, "mimeType"));
 
     if (stream->mime[0] != '\0' && strncmp(stream->mime, "audio/", 6) == 0) { stream->is_audio = 1; }
 
-    cJSON *tmp = NULL;
+    cJSON *tmp = 0x0;
 
     tmp = cJSON_GetObjectItemCaseSensitive(fmt, "itag");
     if (tmp && cJSON_IsNumber(tmp)) { stream->itag = (uint32_t)tmp->valueint; }
@@ -594,7 +594,7 @@ uint32_t yt_json_player_parse(const char *data, size_t len, yt_stream_set_t *str
         for (; idx < fmt_cunt && streams->stream_cunt < YT_STREAM_MAX; idx++)
         {
             cJSON *fmt = cJSON_GetArrayItem(formats, (int)idx);
-            parse_stream_format(fmt, &streams->streams[streams->stream_cunt]);
+            json_stream_parse(fmt, &streams->streams[streams->stream_cunt]);
             if (streams->streams[streams->stream_cunt].url[0] != '\0') { streams->stream_cunt++; }
         }
     }
@@ -608,7 +608,7 @@ uint32_t yt_json_player_parse(const char *data, size_t len, yt_stream_set_t *str
         for (; idx < adp_cunt && streams->stream_cunt < YT_STREAM_MAX; idx++)
         {
             cJSON *fmt = cJSON_GetArrayItem(adaptive, (int)idx);
-            parse_stream_format(fmt, &streams->streams[streams->stream_cunt]);
+            json_stream_parse(fmt, &streams->streams[streams->stream_cunt]);
             if (streams->streams[streams->stream_cunt].url[0] != '\0') { streams->stream_cunt++; }
         }
     }
@@ -630,20 +630,20 @@ uint32_t yt_json_token_parse(const char *data, size_t len, yt_token_t *token)
     cJSON *root = cJSON_ParseWithLength(data, len);
     if (LDG_UNLIKELY(!root)) { return YT_ERR_API_PARSE; }
 
-    const char *at = cjson_path_str(root, "access_token");
+    const char *at = json_cjson_str_get(root, "access_token");
     if (!at)
     {
         cJSON_Delete(root);
         return YT_ERR_AUTH_TOKEN_INVALID;
     }
 
-    safe_str_copy(token->access, sizeof(token->access), at);
+    json_str_copy(token->access, sizeof(token->access), at);
 
-    const char *rt = cjson_path_str(root, "refresh_token");
-    if (rt) { safe_str_copy(token->refresh, sizeof(token->refresh), rt); }
+    const char *rt = json_cjson_str_get(root, "refresh_token");
+    if (rt) { json_str_copy(token->refresh, sizeof(token->refresh), rt); }
 
     cJSON *exp = cJSON_GetObjectItemCaseSensitive(root, "expires_in");
-    if (exp && cJSON_IsNumber(exp)) { token->expiry_epoch = (uint64_t)time(NULL) + (uint64_t)exp->valueint; }
+    if (exp && cJSON_IsNumber(exp)) { token->expiry_epoch = (uint64_t)time(0x0) + (uint64_t)exp->valueint; }
 
     cJSON_Delete(root);
     return LDG_ERR_AOK;
@@ -667,20 +667,20 @@ uint32_t yt_json_device_code_parse(const char *data, size_t len, char *device_co
     cJSON *root = cJSON_ParseWithLength(data, len);
     if (LDG_UNLIKELY(!root)) { return YT_ERR_API_PARSE; }
 
-    const char *dc = cjson_path_str(root, "device_code");
+    const char *dc = json_cjson_str_get(root, "device_code");
     if (!dc)
     {
         cJSON_Delete(root);
         return YT_ERR_AUTH_DEVICE_CODE;
     }
 
-    safe_str_copy(device_code, dc_len, dc);
+    json_str_copy(device_code, dc_len, dc);
 
-    const char *uc = cjson_path_str(root, "user_code");
-    if (uc) { safe_str_copy(user_code, uc_len, uc); }
+    const char *uc = json_cjson_str_get(root, "user_code");
+    if (uc) { json_str_copy(user_code, uc_len, uc); }
 
-    const char *vu = cjson_path_str(root, "verification_url");
-    if (vu) { safe_str_copy(verify_url, vu_len, vu); }
+    const char *vu = json_cjson_str_get(root, "verification_url");
+    if (vu) { json_str_copy(verify_url, vu_len, vu); }
 
     cJSON *iv = cJSON_GetObjectItemCaseSensitive(root, "interval");
     if (iv && cJSON_IsNumber(iv)) { *interval = (uint32_t)iv->valueint; }

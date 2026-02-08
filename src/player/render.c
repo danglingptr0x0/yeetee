@@ -15,14 +15,15 @@
 #include <yeetee/core/err.h>
 #include <yeetee/player/render.h>
 
-#define YT_RENDER_BPP        4
-#define YT_RENDER_MAX_W      1920
-#define YT_RENDER_MAX_H      1080
+#define YT_RENDER_BPP 4
+#define YT_RENDER_MAX_W 1920
+#define YT_RENDER_MAX_H 1080
 #define YT_RENDER_ALPHA_MASK 0xFF000000
 #define YT_RENDER_SHM_PATH_0 "/dev/shm/yeetee_frame_0"
 #define YT_RENDER_SHM_PATH_1 "/dev/shm/yeetee_frame_1"
-#define YT_RENDER_SHM_B64_0  "L2Rldi9zaG0veWVldGVlX2ZyYW1lXzA="
-#define YT_RENDER_SHM_B64_1  "L2Rldi9zaG0veWVldGVlX2ZyYW1lXzE="
+#define YT_RENDER_SHM_B64_0 "L2Rldi9zaG0veWVldGVlX2ZyYW1lXzA="
+#define YT_RENDER_SHM_B64_1 "L2Rldi9zaG0veWVldGVlX2ZyYW1lXzE="
+#define YT_RENDER_ESC_MAX 256
 
 static void render_update_cb(void *arg)
 {
@@ -47,7 +48,7 @@ static void render_frame(yt_render_t *render)
         { MPV_RENDER_PARAM_SW_STRIDE, &stride },
         { MPV_RENDER_PARAM_SW_POINTER, render->shm_map[idx] },
         { MPV_RENDER_PARAM_BLOCK_FOR_TARGET_TIME, &skip_target },
-        { MPV_RENDER_PARAM_INVALID, NULL }
+        { MPV_RENDER_PARAM_INVALID, 0x0 }
     };
 
     int ret = mpv_render_context_render(render->ctx, params);
@@ -66,8 +67,7 @@ static void render_frame(yt_render_t *render)
     render->back = 1 - idx;
 
     render->frame_cunt++;
-    struct timespec ts;
-    memset(&ts, 0, sizeof(ts));
+    struct timespec ts = LDG_STRUCT_ZERO_INIT;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     uint64_t now_ns = (uint64_t)ts.tv_sec * LDG_NS_PER_SEC + (uint64_t)ts.tv_nsec;
 
@@ -87,8 +87,7 @@ static void* render_loop(void *arg)
     {
         render_frame(render);
 
-        struct timespec ts;
-        ts.tv_sec = 0;
+        struct timespec ts = LDG_STRUCT_ZERO_INIT;
         ts.tv_nsec = 1000000;
         nanosleep(&ts, 0x0);
     }
@@ -105,8 +104,8 @@ uint32_t yt_render_init(yt_render_t *render, mpv_handle *mpv, struct ncplane *pa
     if (LDG_UNLIKELY(!parent)) { return LDG_ERR_FUNC_ARG_NULL; }
 
     memset(render, 0, sizeof(*render));
-    render->shm_fd[0] = -1;
-    render->shm_fd[1] = -1;
+    render->shm_fd[0] = UINT32_MAX;
+    render->shm_fd[1] = UINT32_MAX;
 
     unsigned pix_y = 0;
     unsigned pix_x = 0;
@@ -152,34 +151,36 @@ uint32_t yt_render_init(yt_render_t *render, mpv_handle *mpv, struct ncplane *pa
     uint32_t b = 0;
     for (; b < 2; b++)
     {
-        render->shm_fd[b] = open(shm_paths[b], O_RDWR | O_CREAT | O_TRUNC, 0600);
-        if (LDG_UNLIKELY(render->shm_fd[b] < 0))
+        int fd = open(shm_paths[b], O_RDWR | O_CREAT | O_TRUNC, 0600);
+        if (LDG_UNLIKELY(fd < 0))
         {
             syslog(LOG_ERR, "render_init; open shm failed; idx: %u", b);
-            if (b == 1) { munmap(render->shm_map[0], render->shm_size); render->shm_map[0] = 0x0; close(render->shm_fd[0]); render->shm_fd[0] = -1; }
+            if (b == 1) { munmap(render->shm_map[0], render->shm_size); render->shm_map[0] = 0x0; close((int)render->shm_fd[0]); render->shm_fd[0] = UINT32_MAX; }
 
             return YT_ERR_PLAYER_RENDER_INIT;
         }
 
-        int ft = ftruncate(render->shm_fd[b], (off_t)render->shm_size);
+        render->shm_fd[b] = (uint32_t)fd;
+
+        int ft = ftruncate((int)render->shm_fd[b], (off_t)render->shm_size);
         if (LDG_UNLIKELY(ft < 0))
         {
             syslog(LOG_ERR, "render_init; ftruncate shm failed; idx: %u", b);
-            close(render->shm_fd[b]);
-            render->shm_fd[b] = -1;
-            if (b == 1) { munmap(render->shm_map[0], render->shm_size); render->shm_map[0] = 0x0; close(render->shm_fd[0]); render->shm_fd[0] = -1; }
+            close((int)render->shm_fd[b]);
+            render->shm_fd[b] = UINT32_MAX;
+            if (b == 1) { munmap(render->shm_map[0], render->shm_size); render->shm_map[0] = 0x0; close((int)render->shm_fd[0]); render->shm_fd[0] = UINT32_MAX; }
 
             return YT_ERR_PLAYER_RENDER_INIT;
         }
 
-        render->shm_map[b] = (uint8_t *)mmap(0x0, render->shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, render->shm_fd[b], 0);
+        render->shm_map[b] = (uint8_t *)mmap(0x0, render->shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, (int)render->shm_fd[b], 0);
         if (LDG_UNLIKELY(render->shm_map[b] == MAP_FAILED))
         {
             syslog(LOG_ERR, "render_init; mmap shm failed; idx: %u", b);
             render->shm_map[b] = 0x0;
-            close(render->shm_fd[b]);
-            render->shm_fd[b] = -1;
-            if (b == 1) { munmap(render->shm_map[0], render->shm_size); render->shm_map[0] = 0x0; close(render->shm_fd[0]); render->shm_fd[0] = -1; }
+            close((int)render->shm_fd[b]);
+            render->shm_fd[b] = UINT32_MAX;
+            if (b == 1) { munmap(render->shm_map[0], render->shm_size); render->shm_map[0] = 0x0; close((int)render->shm_fd[0]); render->shm_fd[0] = UINT32_MAX; }
 
             return YT_ERR_PLAYER_RENDER_INIT;
         }
@@ -187,14 +188,14 @@ uint32_t yt_render_init(yt_render_t *render, mpv_handle *mpv, struct ncplane *pa
 
     mpv_render_param params[] = {
         { MPV_RENDER_PARAM_API_TYPE, (void *)MPV_RENDER_API_TYPE_SW },
-        { MPV_RENDER_PARAM_INVALID, NULL }
+        { MPV_RENDER_PARAM_INVALID, 0x0 }
     };
 
     int ret = mpv_render_context_create(&render->ctx, mpv, params);
     if (LDG_UNLIKELY(ret < 0))
     {
         syslog(LOG_ERR, "render_init; mpv_render_context_create failed; ret: %d", ret);
-        for (b = 0; b < 2; b++) { munmap(render->shm_map[b], render->shm_size); render->shm_map[b] = 0x0; close(render->shm_fd[b]); render->shm_fd[b] = -1; }
+        for (b = 0; b < 2; b++) { munmap(render->shm_map[b], render->shm_size); render->shm_map[b] = 0x0; close((int)render->shm_fd[b]); render->shm_fd[b] = UINT32_MAX; }
         return YT_ERR_PLAYER_RENDER_INIT;
     }
 
@@ -208,8 +209,7 @@ uint32_t yt_render_init(yt_render_t *render, mpv_handle *mpv, struct ncplane *pa
     ncplane_dim_yx(parent, &parent_rows, &parent_cols);
     int offset_x = (parent_cols > cell_cols) ? (int)(parent_cols - cell_cols) / 2 : 0;
 
-    ncplane_options nopts;
-    memset(&nopts, 0, sizeof(nopts));
+    ncplane_options nopts = LDG_STRUCT_ZERO_INIT;
     nopts.y = 0;
     nopts.x = offset_x;
     nopts.rows = cell_rows;
@@ -218,10 +218,10 @@ uint32_t yt_render_init(yt_render_t *render, mpv_handle *mpv, struct ncplane *pa
     render->video_plane = ncplane_create(parent, &nopts);
     if (LDG_UNLIKELY(!render->video_plane))
     {
-        syslog(LOG_ERR, "render_init; ncplane_create failed");
+        syslog(LOG_ERR, "%s", "render_init; ncplane_create failed");
         mpv_render_context_free(render->ctx);
         render->ctx = 0x0;
-        for (b = 0; b < 2; b++) { munmap(render->shm_map[b], render->shm_size); render->shm_map[b] = 0x0; close(render->shm_fd[b]); render->shm_fd[b] = -1; }
+        for (b = 0; b < 2; b++) { munmap(render->shm_map[b], render->shm_size); render->shm_map[b] = 0x0; close((int)render->shm_fd[b]); render->shm_fd[b] = UINT32_MAX; }
         return YT_ERR_PLAYER_RENDER_INIT;
     }
 
@@ -238,28 +238,23 @@ uint32_t yt_render_init(yt_render_t *render, mpv_handle *mpv, struct ncplane *pa
     for (b = 0; b < 2; b++)
     {
         uint32_t other = 1 - b;
-        memset(render->esc_cmd[b], 0, sizeof(render->esc_cmd[b]));
-        int esc_ret = snprintf(render->esc_cmd[b], sizeof(render->esc_cmd[b]), "\x1b[?2026h"
-            "\x1b[%u;%uH"
-            "\x1b_Ga=T,q=2,f=32,s=%u,v=%u,i=%u,t=f,c=%u,r=%u;%s\x1b\\"
-            "\x1b_Ga=d,d=I,i=%u,q=2;\x1b\\"
-            "\x1b[?2026l", render->video_abs_y + 1, render->video_abs_x + 1, render->pixel_w, render->pixel_h, kitty_id[b], render->video_cell_cols, render->video_cell_rows, shm_b64[b], kitty_id[other]);
-        if (LDG_UNLIKELY(esc_ret < 0 || esc_ret >= (int)sizeof(render->esc_cmd[b])))
+        memset(render->esc_cmd[b], 0, YT_RENDER_ESC_MAX);
+        int esc_ret = snprintf(render->esc_cmd[b], YT_RENDER_ESC_MAX, "\x1b[?2026h""\x1b[%u;%uH""\x1b_Ga=T,q=2,f=32,s=%u,v=%u,i=%u,t=f,c=%u,r=%u;%s\x1b\\""\x1b_Ga=d,d=I,i=%u,q=2;\x1b\\""\x1b[?2026l", render->video_abs_y + 1, render->video_abs_x + 1, render->pixel_w, render->pixel_h, kitty_id[b], render->video_cell_cols, render->video_cell_rows, shm_b64[b], kitty_id[other]);
+        if (LDG_UNLIKELY(esc_ret < 0 || esc_ret >= (int)YT_RENDER_ESC_MAX))
         {
             syslog(LOG_ERR, "render_init; esc_cmd overflow; idx: %u", b);
             mpv_render_context_free(render->ctx);
             render->ctx = 0x0;
             ncplane_destroy(render->video_plane);
             render->video_plane = 0x0;
-            for (uint32_t c = 0; c < 2; c++) { munmap(render->shm_map[c], render->shm_size); render->shm_map[c] = 0x0; close(render->shm_fd[c]); render->shm_fd[c] = -1; }
+            for (uint32_t c = 0; c < 2; c++) { munmap(render->shm_map[c], render->shm_size); render->shm_map[c] = 0x0; close((int)render->shm_fd[c]); render->shm_fd[c] = UINT32_MAX; }
             return YT_ERR_PLAYER_RENDER_INIT;
         }
 
         render->esc_len[b] = (uint32_t)esc_ret;
     }
 
-    struct timespec init_ts;
-    memset(&init_ts, 0, sizeof(init_ts));
+    struct timespec init_ts = LDG_STRUCT_ZERO_INIT;
     clock_gettime(CLOCK_MONOTONIC, &init_ts);
     render->fps_epoch_ns = (uint64_t)init_ts.tv_sec * LDG_NS_PER_SEC + (uint64_t)init_ts.tv_nsec;
 
@@ -277,7 +272,7 @@ uint32_t yt_render_init(yt_render_t *render, mpv_handle *mpv, struct ncplane *pa
         render->ctx = 0x0;
         ncplane_destroy(render->video_plane);
         render->video_plane = 0x0;
-        for (b = 0; b < 2; b++) { munmap(render->shm_map[b], render->shm_size); render->shm_map[b] = 0x0; close(render->shm_fd[b]); render->shm_fd[b] = -1; }
+        for (b = 0; b < 2; b++) { munmap(render->shm_map[b], render->shm_size); render->shm_map[b] = 0x0; close((int)render->shm_fd[b]); render->shm_fd[b] = UINT32_MAX; }
         return YT_ERR_PLAYER_RENDER_INIT;
     }
 
@@ -291,14 +286,15 @@ void yt_render_shutdown(yt_render_t *render)
     if (render->running)
     {
         render->running = 0;
-        pthread_join(render->render_thread, 0x0);
+        int join_ret = pthread_join(render->render_thread, 0x0);
+        if (LDG_UNLIKELY(join_ret != 0)) { syslog(LOG_ERR, "render_shutdown; pthread_join failed; ret: %d", join_ret); }
     }
 
     pthread_mutex_destroy(&render->stdout_mut);
 
     char del_esc[] = "\x1b_Ga=d,d=I,i=1,q=2;\x1b\\\x1b_Ga=d,d=I,i=2,q=2;\x1b\\";
     ssize_t wr = write(STDOUT_FILENO, del_esc, sizeof(del_esc) - 1);
-    if (wr < 0) { syslog(LOG_ERR, "render_shutdown; kitty delete write failed"); }
+    if (wr < 0) { syslog(LOG_ERR, "%s", "render_shutdown; kitty delete write failed"); }
 
     if (render->ctx)
     {
@@ -321,26 +317,30 @@ void yt_render_shutdown(yt_render_t *render)
             render->shm_map[b] = 0x0;
         }
 
-        if (render->shm_fd[b] >= 0)
+        if (render->shm_fd[b] != UINT32_MAX)
         {
-            close(render->shm_fd[b]);
-            render->shm_fd[b] = -1;
+            close((int)render->shm_fd[b]);
+            render->shm_fd[b] = UINT32_MAX;
         }
     }
 
     int ul = unlink(YT_RENDER_SHM_PATH_0);
-    if (ul < 0) { syslog(LOG_ERR, "render_shutdown; shm unlink failed; idx: 0"); }
+    if (ul < 0) { syslog(LOG_ERR, "%s", "render_shutdown; shm unlink failed; idx: 0"); }
 
     ul = unlink(YT_RENDER_SHM_PATH_1);
-    if (ul < 0) { syslog(LOG_ERR, "render_shutdown; shm unlink failed; idx: 1"); }
+    if (ul < 0) { syslog(LOG_ERR, "%s", "render_shutdown; shm unlink failed; idx: 1"); }
 }
 
 void yt_render_stdout_lock(yt_render_t *render)
 {
+    if (LDG_UNLIKELY(!render)) { return; }
+
     pthread_mutex_lock(&render->stdout_mut);
 }
 
 void yt_render_stdout_unlock(yt_render_t *render)
 {
+    if (LDG_UNLIKELY(!render)) { return; }
+
     pthread_mutex_unlock(&render->stdout_mut);
 }

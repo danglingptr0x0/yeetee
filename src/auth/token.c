@@ -16,15 +16,15 @@
 #include <yeetee/auth/token.h>
 #include <yeetee/api/json.h>
 
-#define TOKEN_FILENAME  "token"
-#define TOKEN_PATH_MAX  1024
-#define TOKEN_BUFF_MAX  4096
+#define TOKEN_FILENAME "token"
+#define TOKEN_PATH_MAX 1024
+#define TOKEN_BUFF_MAX 4096
 #define TOKEN_REFRESH_URL "https://oauth2.googleapis.com/token"
-#define TOKEN_BODY_MAX  2048
+#define TOKEN_BODY_MAX 2048
 
 // token
 
-static uint32_t build_token_path(char *buff, size_t buff_len, const char *data_dir)
+static uint32_t token_path_build(char *buff, size_t buff_len, const char *data_dir)
 {
     int written = 0;
 
@@ -49,7 +49,7 @@ uint32_t yt_token_store(const yt_token_t *token, const char *data_dir)
 
     mkdir(data_dir, 0700);
 
-    ret = build_token_path(path, sizeof(path), data_dir);
+    ret = token_path_build(path, sizeof(path), data_dir);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return ret; }
 
     fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
@@ -70,7 +70,7 @@ uint32_t yt_token_store(const yt_token_t *token, const char *data_dir)
     return LDG_ERR_AOK;
 }
 
-static uint32_t parse_token_line(const char *line, yt_token_t *token)
+static uint32_t token_line_parse(const char *line, yt_token_t *token)
 {
     if (strncmp(line, "access=", 7) == 0)
     {
@@ -111,7 +111,7 @@ uint32_t yt_token_load(yt_token_t *token, const char *data_dir)
     int32_t fd = 0;
     ssize_t rd_ret = 0;
 
-    ret = build_token_path(path, sizeof(path), data_dir);
+    ret = token_path_build(path, sizeof(path), data_dir);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return ret; }
 
     fd = open(path, O_RDONLY);
@@ -127,14 +127,14 @@ uint32_t yt_token_load(yt_token_t *token, const char *data_dir)
     memset(token, 0, sizeof(*token));
 
     char *line = buff;
-    char *nl = NULL;
-    while ((nl = strchr(line, '\n')) != NULL)
+    char *nl = 0x0;
+    while ((nl = strchr(line, '\n')) != 0x0)
     {
         *nl = '\0';
-        parse_token_line(line, token);
+        token_line_parse(line, token);
         line = nl + 1;
     }
-    if (*line != '\0') { parse_token_line(line, token); }
+    if (*line != '\0') { token_line_parse(line, token); }
 
     return LDG_ERR_AOK;
 }
@@ -151,7 +151,7 @@ uint32_t yt_token_refresh(ldg_curl_easy_ctx_t *curl, const char *client_id, cons
 
     uint32_t ret = LDG_ERR_AOK;
     char body[TOKEN_BODY_MAX] = LDG_ARR_ZERO_INIT;
-    struct curl_slist *headers = NULL;
+    struct curl_slist *headers = 0x0;
     ldg_curl_resp_t http_resp = LDG_STRUCT_ZERO_INIT;
     yt_token_t refreshed = LDG_STRUCT_ZERO_INIT;
 
@@ -190,10 +190,8 @@ uint32_t yt_token_refresh(ldg_curl_easy_ctx_t *curl, const char *client_id, cons
 
 uint32_t yt_token_expired_is(const yt_token_t *token)
 {
-    if (LDG_UNLIKELY(!token)) { return 1; }
+    if (LDG_UNLIKELY(!token)) { return LDG_ERR_FUNC_ARG_NULL; }
 
-    time_t now = time(NULL);
-    if ((uint64_t)now >= token->expiry_epoch) { return 1; }
-
-    return 0;
+    time_t now = time(0x0);
+    return (uint64_t)now >= token->expiry_epoch;
 }

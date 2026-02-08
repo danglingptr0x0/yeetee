@@ -3,6 +3,8 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <syslog.h>
 #include <dangling/core/macros.h>
 #include <dangling/core/err.h>
 #include <dangling/net/curl.h>
@@ -18,10 +20,9 @@ uint32_t yt_thumb_cache_init(yt_thumb_cache_t *cache, uint32_t capacity)
 
     if (LDG_UNLIKELY(capacity == 0)) { return LDG_ERR_FUNC_ARG_INVALID; }
 
-    cache->entries = malloc(capacity * sizeof(yt_thumb_entry_t));
+    cache->entries = (yt_thumb_entry_t *)calloc(capacity, sizeof(yt_thumb_entry_t));
     if (LDG_UNLIKELY(!cache->entries)) { return LDG_ERR_ALLOC_NULL; }
 
-    memset(cache->entries, 0, capacity * sizeof(yt_thumb_entry_t));
     cache->capacity = capacity;
     cache->cunt = 0;
 
@@ -38,31 +39,31 @@ void yt_thumb_cache_shutdown(yt_thumb_cache_t *cache)
     for (; i < cache->cunt; i++) { if (cache->entries[i].loaded)
         {
             ncvisual_destroy(cache->entries[i].vis);
-            cache->entries[i].vis = NULL;
+            cache->entries[i].vis = 0x0;
         }
     }
 
     free(cache->entries);
-    cache->entries = NULL;
+    cache->entries = 0x0;
     cache->cunt = 0;
     cache->capacity = 0;
 }
 
 struct ncvisual* yt_thumb_cache_get(yt_thumb_cache_t *cache, const char *video_id)
 {
-    if (LDG_UNLIKELY(!cache)) { return NULL; }
+    if (LDG_UNLIKELY(!cache)) { return 0x0; }
 
-    if (LDG_UNLIKELY(!video_id)) { return NULL; }
+    if (LDG_UNLIKELY(!video_id)) { return 0x0; }
 
     uint32_t i = 0;
     for (; i < cache->cunt; i++) { if (cache->entries[i].loaded && strncmp(cache->entries[i].video_id, video_id, YT_VIDEO_ID_MAX) == 0)
         {
-            cache->entries[i].last_used = (uint64_t)time(NULL);
+            cache->entries[i].last_used = (uint64_t)time(0x0);
             return cache->entries[i].vis;
         }
     }
 
-    return NULL;
+    return 0x0;
 }
 
 uint32_t yt_thumb_cache_put(yt_thumb_cache_t *cache, const char *video_id, struct ncvisual *vis)
@@ -73,7 +74,7 @@ uint32_t yt_thumb_cache_put(yt_thumb_cache_t *cache, const char *video_id, struc
 
     if (LDG_UNLIKELY(!vis)) { return LDG_ERR_FUNC_ARG_NULL; }
 
-    yt_thumb_entry_t *slot = NULL;
+    yt_thumb_entry_t *slot = 0x0;
 
     if (cache->cunt < cache->capacity)
     {
@@ -101,7 +102,7 @@ uint32_t yt_thumb_cache_put(yt_thumb_cache_t *cache, const char *video_id, struc
     slot->video_id[YT_VIDEO_ID_MAX - 1] = LDG_STR_TERM;
     slot->vis = vis;
     slot->loaded = 1;
-    slot->last_used = (uint64_t)time(NULL);
+    slot->last_used = (uint64_t)time(0x0);
 
     return LDG_ERR_AOK;
 }
@@ -116,17 +117,17 @@ uint32_t yt_thumb_fetch(const char *url, const char *cache_dir, const char *vide
 
     if (LDG_UNLIKELY(!vis_out)) { return LDG_ERR_FUNC_ARG_NULL; }
 
-    char path[YT_THUMB_PATH_MAX];
+    char path[YT_THUMB_PATH_MAX] = LDG_ARR_ZERO_INIT;
     snprintf(path, sizeof(path), "%s/thumb_%s.jpg", cache_dir, video_id);
 
-    ldg_curl_easy_ctx_t curl_ctx;
+    ldg_curl_easy_ctx_t curl_ctx = LDG_STRUCT_ZERO_INIT;
     uint32_t ret = ldg_curl_easy_ctx_create(&curl_ctx);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return ret; }
 
-    ldg_curl_resp_t resp;
+    ldg_curl_resp_t resp = LDG_STRUCT_ZERO_INIT;
     ldg_curl_resp_init(&resp);
 
-    ret = ldg_curl_easy_get(&curl_ctx, url, NULL, &resp);
+    ret = ldg_curl_easy_get(&curl_ctx, url, 0x0, &resp);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK))
     {
         ldg_curl_resp_free(&resp);
@@ -134,18 +135,19 @@ uint32_t yt_thumb_fetch(const char *url, const char *cache_dir, const char *vide
         return ret;
     }
 
-    FILE *fp = fopen(path, "wb");
-    if (LDG_UNLIKELY(!fp))
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (LDG_UNLIKELY(fd < 0))
     {
         ldg_curl_resp_free(&resp);
         ldg_curl_easy_ctx_destroy(&curl_ctx);
         return LDG_ERR_IO_OPEN;
     }
 
-    size_t written = fwrite(resp.data, 1, resp.size, fp);
-    fclose(fp);
+    ssize_t written = write(fd, resp.data, resp.size);
+    int cr = close(fd);
+    if (LDG_UNLIKELY(cr != 0)) { syslog(LOG_ERR, "thumb_fetch; close failed; path: %s", path); }
 
-    if (LDG_UNLIKELY(written != resp.size))
+    if (LDG_UNLIKELY(written < 0 || (size_t)written != resp.size))
     {
         unlink(path);
         ldg_curl_resp_free(&resp);

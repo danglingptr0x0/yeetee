@@ -6,7 +6,7 @@
 
 // err strings
 #define YT_ERR_BASE 700
-#define YT_ERR_MAX  799
+#define YT_ERR_MAX 799
 #define YT_ERR_CUNT (YT_ERR_MAX - YT_ERR_BASE + 1)
 
 static const char *yt_err_strs[YT_ERR_CUNT] = {

@@ -16,14 +16,14 @@
 #include <yeetee/api/ytdlp.h>
 #include <yeetee/api/json.h>
 
-#define YTDLP_BUFF_MAX     (256 * 1024)
-#define YTDLP_SEARCH_MAX   32
-#define YTDLP_LINE_MAX     (128 * 1024)
-#define YTDLP_READ_CHUNK   4096
+#define YTDLP_BUFF_MAX (256 * 1024)
+#define YTDLP_SEARCH_MAX 32
+#define YTDLP_LINE_MAX (128 * 1024)
+#define YTDLP_READ_CHUNK 4096
 
 // ytdlp
 
-static uint32_t exec_ytdlp_read(char *const argv[], char *buff, size_t buff_len, size_t *out_len)
+static uint32_t ytdlp_exec_read(char *const argv[], char *buff, size_t buff_len, size_t *out_len)
 {
     int32_t pipefd[2] = LDG_ARR_ZERO_INIT;
     pid_t pid = 0;
@@ -74,7 +74,7 @@ static uint32_t exec_ytdlp_read(char *const argv[], char *buff, size_t buff_len,
     return LDG_ERR_AOK;
 }
 
-static void parse_ytdlp_formats(cJSON *root, yt_stream_set_t *streams)
+static void ytdlp_formats_parse(cJSON *root, yt_stream_set_t *streams)
 {
     cJSON *formats = cJSON_GetObjectItemCaseSensitive(root, "formats");
     if (!formats || !cJSON_IsArray(formats)) { return; }
@@ -86,7 +86,7 @@ static void parse_ytdlp_formats(cJSON *root, yt_stream_set_t *streams)
     {
         cJSON *fmt = cJSON_GetArrayItem(formats, (int)idx);
         yt_stream_t *stream = &streams->streams[streams->stream_cunt];
-        cJSON *tmp = NULL;
+        cJSON *tmp = 0x0;
 
         memset(stream, 0, sizeof(*stream));
 
@@ -120,11 +120,11 @@ static void parse_ytdlp_formats(cJSON *root, yt_stream_set_t *streams)
             if (vcodec && cJSON_IsString(vcodec) && strcmp(vcodec->valuestring, "none") == 0)
             {
                 stream->is_audio = 1;
-                snprintf(stream->mime, sizeof(stream->mime), "audio/unknown");
+                snprintf(stream->mime, sizeof(stream->mime), "%s", "audio/unknown");
             }
         }
 
-        if (stream->mime[0] == '\0') { snprintf(stream->mime, sizeof(stream->mime), "video/unknown"); }
+        if (stream->mime[0] == '\0') { snprintf(stream->mime, sizeof(stream->mime), "%s", "video/unknown"); }
 
         streams->stream_cunt++;
     }
@@ -137,19 +137,19 @@ uint32_t yt_ytdlp_stream_url_get(const char *video_id, yt_stream_set_t *streams)
     if (LDG_UNLIKELY(!streams)) { return LDG_ERR_FUNC_ARG_NULL; }
 
     uint32_t ret = LDG_ERR_AOK;
-    char *buff = NULL;
+    char *buff = 0x0;
     size_t out_len = 0;
 
     memset(streams, 0, sizeof(*streams));
 
-    char vid_arg[YT_VIDEO_ID_MAX];
+    char vid_arg[YT_VIDEO_ID_MAX] = LDG_ARR_ZERO_INIT;
     snprintf(vid_arg, sizeof(vid_arg), "%s", video_id);
-    char *const argv[] = { (char *)"yt-dlp", (char *)"-j", (char *)"--no-download", (char *)"--", vid_arg, NULL };
+    char *const argv[] = { (char *)"yt-dlp", (char *)"-j", (char *)"--no-download", (char *)"--", vid_arg, 0x0 };
 
     buff = (char *)malloc(YTDLP_BUFF_MAX);
     if (LDG_UNLIKELY(!buff)) { return LDG_ERR_ALLOC_NULL; }
 
-    ret = exec_ytdlp_read(argv, buff, YTDLP_BUFF_MAX, &out_len);
+    ret = ytdlp_exec_read(argv, buff, YTDLP_BUFF_MAX, &out_len);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK))
     {
         free(buff);
@@ -163,7 +163,7 @@ uint32_t yt_ytdlp_stream_url_get(const char *video_id, yt_stream_set_t *streams)
         return YT_ERR_API_PARSE;
     }
 
-    parse_ytdlp_formats(root, streams);
+    ytdlp_formats_parse(root, streams);
 
     cJSON_Delete(root);
     free(buff);
@@ -173,14 +173,14 @@ uint32_t yt_ytdlp_stream_url_get(const char *video_id, yt_stream_set_t *streams)
     return LDG_ERR_AOK;
 }
 
-static void parse_ytdlp_video_line(const char *line, yt_video_t *video)
+static void ytdlp_video_line_parse(const char *line, yt_video_t *video)
 {
     memset(video, 0, sizeof(*video));
 
     cJSON *root = cJSON_Parse(line);
     if (!root) { return; }
 
-    cJSON *tmp = NULL;
+    cJSON *tmp = 0x0;
 
     tmp = cJSON_GetObjectItemCaseSensitive(root, "id");
     if (tmp && cJSON_IsString(tmp)) { snprintf(video->id, sizeof(video->id), "%s", tmp->valuestring); }
@@ -219,7 +219,7 @@ uint32_t yt_ytdlp_search(const char *query, uint32_t max_results, yt_feed_t *fee
     if (LDG_UNLIKELY(!feed)) { return LDG_ERR_FUNC_ARG_NULL; }
 
     uint32_t ret = LDG_ERR_AOK;
-    char *buff = NULL;
+    char *buff = 0x0;
     size_t out_len = 0;
     char search_str[YTDLP_SEARCH_MAX + YT_VIDEO_TITLE_MAX] = LDG_ARR_ZERO_INIT;
 
@@ -229,12 +229,12 @@ uint32_t yt_ytdlp_search(const char *query, uint32_t max_results, yt_feed_t *fee
 
     snprintf(search_str, sizeof(search_str), "ytsearch%u:%s", max_results, query);
 
-    char *const argv[] = { (char *)"yt-dlp", (char *)"--dump-json", (char *)"--flat-playlist", (char *)"--", search_str, NULL };
+    char *const argv[] = { (char *)"yt-dlp", (char *)"--dump-json", (char *)"--flat-playlist", (char *)"--", search_str, 0x0 };
 
     buff = (char *)malloc(YTDLP_BUFF_MAX);
     if (LDG_UNLIKELY(!buff)) { return LDG_ERR_ALLOC_NULL; }
 
-    ret = exec_ytdlp_read(argv, buff, YTDLP_BUFF_MAX, &out_len);
+    ret = ytdlp_exec_read(argv, buff, YTDLP_BUFF_MAX, &out_len);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK))
     {
         free(buff);
@@ -242,15 +242,15 @@ uint32_t yt_ytdlp_search(const char *query, uint32_t max_results, yt_feed_t *fee
     }
 
     char *line = buff;
-    char *nl = NULL;
+    char *nl = 0x0;
 
-    while ((nl = strchr(line, '\n')) != NULL && feed->video_cunt < YT_FEED_MAX_VIDEOS)
+    while ((nl = strchr(line, '\n')) != 0x0 && feed->video_cunt < YT_FEED_MAX_VIDEOS)
     {
         *nl = '\0';
 
         if (*line != '\0')
         {
-            parse_ytdlp_video_line(line, &feed->videos[feed->video_cunt]);
+            ytdlp_video_line_parse(line, &feed->videos[feed->video_cunt]);
             if (feed->videos[feed->video_cunt].id[0] != '\0') { feed->video_cunt++; }
         }
 
@@ -259,7 +259,7 @@ uint32_t yt_ytdlp_search(const char *query, uint32_t max_results, yt_feed_t *fee
 
     if (*line != '\0' && feed->video_cunt < YT_FEED_MAX_VIDEOS)
     {
-        parse_ytdlp_video_line(line, &feed->videos[feed->video_cunt]);
+        ytdlp_video_line_parse(line, &feed->videos[feed->video_cunt]);
         if (feed->videos[feed->video_cunt].id[0] != '\0') { feed->video_cunt++; }
     }
 

@@ -6,11 +6,11 @@
 #include <yeetee/tui/feed.h>
 
 #define YT_FEED_ROWS_PER_ENTRY 5
-#define YT_FEED_TITLE_PAD      4
+#define YT_FEED_TITLE_PAD 4
 
 #define YT_FEED_THUMB_COLS 20
 #define YT_FEED_THUMB_ROWS 4
-#define YT_FEED_TEXT_COL   23
+#define YT_FEED_TEXT_COL 23
 
 #define YT_FEED_BG_SEL_R 30
 #define YT_FEED_BG_SEL_G 30
@@ -110,8 +110,7 @@ uint32_t yt_feed_render(yt_feed_ctx_t *ctx, struct ncplane *plane)
         struct ncvisual *vis = yt_thumb_cache_get(&ctx->thumbs, v->id);
         if (vis && ctx->thumb_plane_cunt < YT_FEED_MAX_VISIBLE)
         {
-            struct ncplane_options nopts;
-            memset(&nopts, 0, sizeof(nopts));
+            struct ncplane_options nopts = LDG_STRUCT_ZERO_INIT;
             nopts.y = (int)row_off;
             nopts.x = 2;
             nopts.rows = YT_FEED_THUMB_ROWS;
@@ -120,8 +119,7 @@ uint32_t yt_feed_render(yt_feed_ctx_t *ctx, struct ncplane *plane)
             struct ncplane *tp = ncplane_create(plane, &nopts);
             if (tp)
             {
-                struct ncvisual_options vopts;
-                memset(&vopts, 0, sizeof(vopts));
+                struct ncvisual_options vopts = LDG_STRUCT_ZERO_INIT;
                 vopts.n = tp;
                 vopts.scaling = NCSCALE_STRETCH;
                 vopts.blitter = NCBLIT_PIXEL;
@@ -187,9 +185,6 @@ uint32_t yt_feed_nav_down(yt_feed_ctx_t *ctx)
 {
     if (LDG_UNLIKELY(!ctx)) { return LDG_ERR_FUNC_ARG_NULL; }
 
-    unsigned p_rows = 0;
-    unsigned p_cols = 0;
-
     if (ctx->feed.video_cunt > 0 && ctx->selected_idx < ctx->feed.video_cunt - 1)
     {
         ctx->selected_idx++;
@@ -197,19 +192,16 @@ uint32_t yt_feed_nav_down(yt_feed_ctx_t *ctx)
         if (ctx->selected_idx >= ctx->scroll_offset + visible) { ctx->scroll_offset = ctx->selected_idx - visible + 1; }
     }
 
-    (void)p_rows;
-    (void)p_cols;
-
     return LDG_ERR_AOK;
 }
 
 const yt_video_t* yt_feed_selected_get(const yt_feed_ctx_t *ctx)
 {
-    if (LDG_UNLIKELY(!ctx)) { return NULL; }
+    if (LDG_UNLIKELY(!ctx)) { return 0x0; }
 
-    if (ctx->feed.video_cunt == 0) { return NULL; }
+    if (ctx->feed.video_cunt == 0) { return 0x0; }
 
-    if (ctx->selected_idx >= ctx->feed.video_cunt) { return NULL; }
+    if (ctx->selected_idx >= ctx->feed.video_cunt) { return 0x0; }
 
     return &ctx->feed.videos[ctx->selected_idx];
 }

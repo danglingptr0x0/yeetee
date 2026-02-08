@@ -26,7 +26,7 @@
 #include <yeetee/tui/queue.h>
 #include <yeetee/tui/tui.h>
 
-#define YT_TUI_POLL_NS        50000000
+#define YT_TUI_POLL_NS 50000000
 #define YT_TUI_SEEK_SECS 10.0
 #define YT_TUI_VOL_STEP 5
 #define YT_TUI_VIDEO_INFO_ROWS 3
@@ -42,7 +42,7 @@ static void tui_term_reset(void)
         "\x1b[0m";
 
     ssize_t wr = write(STDOUT_FILENO, esc, sizeof(esc) - 1);
-    if (wr < 0) { syslog(LOG_ERR, "tui_term_reset; write failed"); }
+    if (wr < 0) { syslog(LOG_ERR, "%s", "tui_term_reset; write failed"); }
 }
 
 // signal cleanup cb
@@ -53,7 +53,9 @@ static void tui_signal_cleanup(int sig)
         "\x1b[?25h"
         "\x1b[0m";
 
-    write(STDOUT_FILENO, esc, sizeof(esc) - 1);
+    ssize_t wr = write(STDOUT_FILENO, esc, sizeof(esc) - 1);
+    if (wr < 0) { _exit(128 + sig); }
+
     signal(sig, SIG_DFL);
     raise(sig);
 }
@@ -104,11 +106,9 @@ typedef struct tui_thumb_result
 static void auth_poll_task(void *arg)
 {
     tui_auth_task_ctx_t *ctx = (tui_auth_task_ctx_t *)arg;
-    yt_token_t token;
-    ldg_curl_easy_ctx_t curl;
+    yt_token_t token = LDG_STRUCT_ZERO_INIT;
+    ldg_curl_easy_ctx_t curl = LDG_STRUCT_ZERO_INIT;
     uint32_t ret = 0;
-
-    memset(&token, 0, sizeof(token));
 
     ret = ldg_curl_easy_ctx_create(&curl);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK))
@@ -132,11 +132,9 @@ static void auth_poll_task(void *arg)
 static void feed_browse_task(void *arg)
 {
     tui_feed_task_ctx_t *ctx = (tui_feed_task_ctx_t *)arg;
-    yt_innertube_ctx_t api;
-    yt_feed_t feed;
+    yt_innertube_ctx_t api = LDG_STRUCT_ZERO_INIT;
+    yt_feed_t feed = LDG_STRUCT_ZERO_INIT;
     uint32_t ret = 0;
-
-    memset(&feed, 0, sizeof(feed));
 
     ret = yt_innertube_ctx_init(&api, ctx->access_token);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK))
@@ -157,11 +155,9 @@ static void feed_browse_task(void *arg)
 static void search_task(void *arg)
 {
     tui_search_task_ctx_t *ctx = (tui_search_task_ctx_t *)arg;
-    yt_innertube_ctx_t api;
-    yt_feed_t feed;
+    yt_innertube_ctx_t api = LDG_STRUCT_ZERO_INIT;
+    yt_feed_t feed = LDG_STRUCT_ZERO_INIT;
     uint32_t ret = 0;
-
-    memset(&feed, 0, sizeof(feed));
 
     ret = yt_innertube_ctx_init(&api, ctx->access_token);
     if (ret == LDG_ERR_AOK)
@@ -181,14 +177,13 @@ static void search_task(void *arg)
 static void thumb_fetch_task(void *arg)
 {
     tui_thumb_task_ctx_t *ctx = (tui_thumb_task_ctx_t *)arg;
-    struct ncvisual *vis = NULL;
+    struct ncvisual *vis = 0x0;
     uint32_t ret = 0;
 
     ret = yt_thumb_fetch(ctx->thumb_url, ctx->cache_dir, ctx->video_id, &vis);
     if (ret == LDG_ERR_AOK && vis)
     {
-        tui_thumb_result_t result;
-        memset(&result, 0, sizeof(result));
+        tui_thumb_result_t result = LDG_STRUCT_ZERO_INIT;
         snprintf(result.video_id, sizeof(result.video_id), "%s", ctx->video_id);
         result.vis = vis;
         ldg_spsc_push(ctx->result_q, &result);
@@ -263,7 +258,7 @@ static void tui_auth_start(yt_tui_t *tui)
         return;
     }
 
-    ldg_curl_easy_ctx_t curl;
+    ldg_curl_easy_ctx_t curl = LDG_STRUCT_ZERO_INIT;
     uint32_t ret = ldg_curl_easy_ctx_create(&curl);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK))
     {
@@ -341,20 +336,19 @@ static uint32_t tui_player_ensure(yt_tui_t *tui)
 }
 
 // load video by id
-static void tui_player_load_video(yt_tui_t *tui, const char *video_id)
+static void tui_player_video_load(yt_tui_t *tui, const char *video_id)
 {
     uint32_t ret = tui_player_ensure(tui);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return; }
 
-    char url[128];
-    memset(url, 0, sizeof(url));
+    char url[128] = LDG_ARR_ZERO_INIT;
     snprintf(url, sizeof(url), "https://www.youtube.com/watch?v=%s", video_id);
     syslog(LOG_INFO, "player_load; url: %s", url);
     yt_player_load(&tui->player, url);
 }
 
 // input handlers
-static void tui_handle_feed(yt_tui_t *tui, yt_action_t action)
+static void tui_feed_handle(yt_tui_t *tui, yt_action_t action)
 {
     switch (action)
     {
@@ -391,7 +385,7 @@ static void tui_handle_feed(yt_tui_t *tui, yt_action_t action)
             {
                 yt_queue_push(&tui->queue, vid);
                 tui->current_view = YT_TUI_VIEW_PLAYER;
-                tui_player_load_video(tui, vid->id);
+                tui_player_video_load(tui, vid->id);
             }
 
             break;
@@ -412,7 +406,7 @@ static void tui_handle_feed(yt_tui_t *tui, yt_action_t action)
             break;
 
         case YT_ACTION_SEARCH:
-            memset(tui->search_buff, 0, sizeof(tui->search_buff));
+            memset(tui->search_buff, 0, YT_TUI_SEARCH_MAX);
             tui->search_len = 0;
             tui->current_view = YT_TUI_VIEW_SEARCH;
             break;
@@ -422,7 +416,7 @@ static void tui_handle_feed(yt_tui_t *tui, yt_action_t action)
     }
 }
 
-static void tui_handle_player(yt_tui_t *tui, yt_action_t action)
+static void tui_player_handle(yt_tui_t *tui, yt_action_t action)
 {
     switch (action)
     {
@@ -456,7 +450,7 @@ static void tui_handle_player(yt_tui_t *tui, yt_action_t action)
             break;
 
         case YT_ACTION_SEEK_BACK:
-            if (tui->player_ready) { yt_player_seek(&tui->player, -YT_TUI_SEEK_SECS); }
+            if (tui->player_ready) { yt_player_seek(&tui->player, 0.0 - YT_TUI_SEEK_SECS); }
 
             break;
 
@@ -492,7 +486,7 @@ static void tui_handle_player(yt_tui_t *tui, yt_action_t action)
             if (ret == LDG_ERR_AOK)
             {
                 const yt_video_t *vid = yt_queue_current_get(&tui->queue);
-                if (vid) { tui_player_load_video(tui, vid->id); }
+                if (vid) { tui_player_video_load(tui, vid->id); }
             }
 
             break;
@@ -504,7 +498,7 @@ static void tui_handle_player(yt_tui_t *tui, yt_action_t action)
             if (ret == LDG_ERR_AOK)
             {
                 const yt_video_t *vid = yt_queue_current_get(&tui->queue);
-                if (vid) { tui_player_load_video(tui, vid->id); }
+                if (vid) { tui_player_video_load(tui, vid->id); }
             }
 
             break;
@@ -531,7 +525,7 @@ static void tui_handle_player(yt_tui_t *tui, yt_action_t action)
     }
 }
 
-static void tui_handle_queue(yt_tui_t *tui, yt_action_t action)
+static void tui_queue_handle(yt_tui_t *tui, yt_action_t action)
 {
     switch (action)
     {
@@ -566,7 +560,7 @@ static void tui_handle_queue(yt_tui_t *tui, yt_action_t action)
                 tui->queue.current_idx = tui->queue.selected_idx;
                 tui->current_view = YT_TUI_VIEW_PLAYER;
                 const yt_video_t *vid = yt_queue_current_get(&tui->queue);
-                if (vid) { tui_player_load_video(tui, vid->id); }
+                if (vid) { tui_player_video_load(tui, vid->id); }
             }
 
             break;
@@ -579,7 +573,7 @@ static void tui_handle_queue(yt_tui_t *tui, yt_action_t action)
             {
                 tui->current_view = YT_TUI_VIEW_PLAYER;
                 const yt_video_t *vid = yt_queue_current_get(&tui->queue);
-                if (vid) { tui_player_load_video(tui, vid->id); }
+                if (vid) { tui_player_video_load(tui, vid->id); }
             }
 
             break;
@@ -592,7 +586,7 @@ static void tui_handle_queue(yt_tui_t *tui, yt_action_t action)
             {
                 tui->current_view = YT_TUI_VIEW_PLAYER;
                 const yt_video_t *vid = yt_queue_current_get(&tui->queue);
-                if (vid) { tui_player_load_video(tui, vid->id); }
+                if (vid) { tui_player_video_load(tui, vid->id); }
             }
 
             break;
@@ -611,7 +605,7 @@ static void tui_handle_queue(yt_tui_t *tui, yt_action_t action)
     }
 }
 
-static void tui_handle_search(yt_tui_t *tui, const struct ncinput *ni)
+static void tui_search_handle(yt_tui_t *tui, const struct ncinput *ni)
 {
     if (ni->id == NCKEY_ESC)
     {
@@ -662,7 +656,7 @@ static void tui_handle_search(yt_tui_t *tui, const struct ncinput *ni)
 }
 
 // renderers
-static void tui_render_auth(yt_tui_t *tui)
+static void tui_auth_render(yt_tui_t *tui)
 {
     yt_layout_header_render(&tui->layout, "auth");
     ncplane_erase(tui->layout.content);
@@ -705,18 +699,17 @@ static void tui_render_auth(yt_tui_t *tui)
     yt_layout_status_render(&tui->layout, "waiting for authorization | r:retry q:quit");
 }
 
-static void tui_render_feed(yt_tui_t *tui)
+static void tui_feed_render(yt_tui_t *tui)
 {
     yt_layout_header_render(&tui->layout, "feed");
     yt_feed_render(&tui->feed, tui->layout.content);
 
-    char status_msg[128];
-    memset(status_msg, 0, sizeof(status_msg));
+    char status_msg[128] = LDG_ARR_ZERO_INIT;
     snprintf(status_msg, sizeof(status_msg), "videos: %u | q:quit j/k:nav enter:play a:queue l:queue r:refresh /:search", tui->feed.feed.video_cunt);
     yt_layout_status_render(&tui->layout, status_msg);
 }
 
-static void tui_render_player(yt_tui_t *tui)
+static void tui_player_render(yt_tui_t *tui)
 {
     yt_layout_header_render(&tui->layout, "player");
 
@@ -763,8 +756,7 @@ static void tui_render_player(yt_tui_t *tui)
 
             if (filled > bar_w) { filled = bar_w; }
 
-            char bar[256];
-            memset(bar, 0, sizeof(bar));
+            char bar[256] = LDG_ARR_ZERO_INIT;
             uint32_t bi = 0;
             for (; bi < bar_w && bi < sizeof(bar) - 1; bi++) { bar[bi] = (bi < filled) ? '=' : '-'; }
             bar[bi] = '\0';
@@ -796,7 +788,7 @@ static void tui_render_player(yt_tui_t *tui)
     }
 }
 
-static void tui_render_search(yt_tui_t *tui)
+static void tui_search_render(yt_tui_t *tui)
 {
     yt_layout_header_render(&tui->layout, "search");
     ncplane_erase(tui->layout.content);
@@ -813,13 +805,12 @@ static void tui_render_search(yt_tui_t *tui)
     yt_layout_status_render(&tui->layout, "type query, enter:search esc:cancel");
 }
 
-static void tui_render_queue(yt_tui_t *tui)
+static void tui_queue_render(yt_tui_t *tui)
 {
     yt_layout_header_render(&tui->layout, "queue");
     yt_queue_render(&tui->queue, tui->layout.content);
 
-    char status_msg[128];
-    memset(status_msg, 0, sizeof(status_msg));
+    char status_msg[128] = LDG_ARR_ZERO_INIT;
     snprintf(status_msg, sizeof(status_msg), "tracks: %u | j/k:nav enter:play s:shuffle esc:back", tui->queue.cunt);
     yt_layout_status_render(&tui->layout, status_msg);
 }
@@ -838,18 +829,17 @@ uint32_t yt_tui_init(yt_tui_t *tui, yt_conf_t *conf)
     signal(SIGINT, tui_signal_cleanup);
     signal(SIGTERM, tui_signal_cleanup);
 
-    notcurses_options nc_opts;
-    memset(&nc_opts, 0, sizeof(nc_opts));
+    notcurses_options nc_opts = LDG_STRUCT_ZERO_INIT;
     nc_opts.flags = NCOPTION_SUPPRESS_BANNERS;
 
-    tui->nc = notcurses_init(&nc_opts, NULL);
+    tui->nc = notcurses_init(&nc_opts, 0x0);
     if (LDG_UNLIKELY(!tui->nc)) { return YT_ERR_TUI_INIT; }
 
     uint32_t err = yt_layout_init(&tui->layout, tui->nc);
     if (LDG_UNLIKELY(err != LDG_ERR_AOK))
     {
         notcurses_stop(tui->nc);
-        tui->nc = NULL;
+        tui->nc = 0x0;
         return err;
     }
 
@@ -858,7 +848,7 @@ uint32_t yt_tui_init(yt_tui_t *tui, yt_conf_t *conf)
     {
         yt_layout_shutdown(&tui->layout);
         notcurses_stop(tui->nc);
-        tui->nc = NULL;
+        tui->nc = 0x0;
         return err;
     }
 
@@ -868,7 +858,7 @@ uint32_t yt_tui_init(yt_tui_t *tui, yt_conf_t *conf)
         ldg_thread_pool_shutdown(&tui->pool);
         yt_layout_shutdown(&tui->layout);
         notcurses_stop(tui->nc);
-        tui->nc = NULL;
+        tui->nc = 0x0;
         return err;
     }
 
@@ -879,7 +869,7 @@ uint32_t yt_tui_init(yt_tui_t *tui, yt_conf_t *conf)
         ldg_thread_pool_shutdown(&tui->pool);
         yt_layout_shutdown(&tui->layout);
         notcurses_stop(tui->nc);
-        tui->nc = NULL;
+        tui->nc = 0x0;
         return err;
     }
 
@@ -891,7 +881,7 @@ uint32_t yt_tui_init(yt_tui_t *tui, yt_conf_t *conf)
         ldg_thread_pool_shutdown(&tui->pool);
         yt_layout_shutdown(&tui->layout);
         notcurses_stop(tui->nc);
-        tui->nc = NULL;
+        tui->nc = 0x0;
         return err;
     }
 
@@ -904,7 +894,7 @@ uint32_t yt_tui_init(yt_tui_t *tui, yt_conf_t *conf)
         ldg_thread_pool_shutdown(&tui->pool);
         yt_layout_shutdown(&tui->layout);
         notcurses_stop(tui->nc);
-        tui->nc = NULL;
+        tui->nc = 0x0;
         return err;
     }
 
@@ -918,7 +908,7 @@ uint32_t yt_tui_init(yt_tui_t *tui, yt_conf_t *conf)
         ldg_thread_pool_shutdown(&tui->pool);
         yt_layout_shutdown(&tui->layout);
         notcurses_stop(tui->nc);
-        tui->nc = NULL;
+        tui->nc = 0x0;
         return err;
     }
 
@@ -933,7 +923,7 @@ uint32_t yt_tui_init(yt_tui_t *tui, yt_conf_t *conf)
 
     if (yt_token_expired_is(&tui->token))
     {
-        ldg_curl_easy_ctx_t curl;
+        ldg_curl_easy_ctx_t curl = LDG_STRUCT_ZERO_INIT;
         err = ldg_curl_easy_ctx_create(&curl);
         if (err == LDG_ERR_AOK)
         {
@@ -974,8 +964,7 @@ uint32_t yt_tui_run(yt_tui_t *tui)
 
     tui->running = 1;
 
-    struct timespec ts;
-    ts.tv_sec = 0;
+    struct timespec ts = LDG_STRUCT_ZERO_INIT;
     ts.tv_nsec = YT_TUI_POLL_NS;
     uint64_t player_render_ns = 0;
 
@@ -988,8 +977,7 @@ uint32_t yt_tui_run(yt_tui_t *tui)
         if (tui->current_view == YT_TUI_VIEW_FEED && tui->feed.loading && !tui->feed_req_pending) { tui_feed_request(tui); }
 
         // input
-        struct ncinput ni;
-        memset(&ni, 0, sizeof(ni));
+        struct ncinput ni = LDG_STRUCT_ZERO_INIT;
         uint32_t got = notcurses_get(tui->nc, &ts, &ni);
 
         if (got != 0 && ni.id == NCKEY_RESIZE)
@@ -1030,7 +1018,7 @@ uint32_t yt_tui_run(yt_tui_t *tui)
                     break;
                 }
 
-                tui_handle_search(tui, &ni);
+                tui_search_handle(tui, &ni);
             }
             else
             {
@@ -1054,15 +1042,15 @@ uint32_t yt_tui_run(yt_tui_t *tui)
                         break;
 
                     case YT_TUI_VIEW_FEED:
-                        tui_handle_feed(tui, action);
+                        tui_feed_handle(tui, action);
                         break;
 
                     case YT_TUI_VIEW_PLAYER:
-                        tui_handle_player(tui, action);
+                        tui_player_handle(tui, action);
                         break;
 
                     case YT_TUI_VIEW_QUEUE:
-                        tui_handle_queue(tui, action);
+                        tui_queue_handle(tui, action);
                         break;
 
                     case YT_TUI_VIEW_SEARCH:
@@ -1076,8 +1064,7 @@ uint32_t yt_tui_run(yt_tui_t *tui)
 
         // poll auth result
         {
-            yt_token_t auth_token;
-            memset(&auth_token, 0, sizeof(auth_token));
+            yt_token_t auth_token = LDG_STRUCT_ZERO_INIT;
             if (ldg_spsc_pop(&tui->auth_result_q, &auth_token) == LDG_ERR_AOK)
             {
                 memcpy(&tui->token, &auth_token, sizeof(auth_token));
@@ -1092,8 +1079,7 @@ uint32_t yt_tui_run(yt_tui_t *tui)
 
         // poll feed result
         {
-            yt_feed_t feed_result;
-            memset(&feed_result, 0, sizeof(feed_result));
+            yt_feed_t feed_result = LDG_STRUCT_ZERO_INIT;
             if (ldg_spsc_pop(&tui->api_result_q, &feed_result) == LDG_ERR_AOK)
             {
                 memcpy(&tui->feed.feed, &feed_result, sizeof(feed_result));
@@ -1107,16 +1093,14 @@ uint32_t yt_tui_run(yt_tui_t *tui)
 
         // poll thumb results
         {
-            tui_thumb_result_t thumb_result;
-            memset(&thumb_result, 0, sizeof(thumb_result));
+            tui_thumb_result_t thumb_result = LDG_STRUCT_ZERO_INIT;
             while (ldg_spsc_pop(&tui->thumb_result_q, &thumb_result) == LDG_ERR_AOK) { yt_thumb_cache_put(&tui->feed.thumbs, thumb_result.video_id, thumb_result.vis); }
         }
 
         // poll player events
         if (tui->player_ready)
         {
-            yt_player_event_t pe;
-            memset(&pe, 0, sizeof(pe));
+            yt_player_event_t pe = LDG_STRUCT_ZERO_INIT;
             while (ldg_spsc_pop(&tui->player.event_q, &pe) == LDG_ERR_AOK)
             {
                 if (pe.eof_reached)
@@ -1125,7 +1109,7 @@ uint32_t yt_tui_run(yt_tui_t *tui)
                     if (next_ret == LDG_ERR_AOK)
                     {
                         const yt_video_t *vid = yt_queue_current_get(&tui->queue);
-                        if (vid) { tui_player_load_video(tui, vid->id); }
+                        if (vid) { tui_player_video_load(tui, vid->id); }
                     }
                     else
                     {
@@ -1144,14 +1128,13 @@ uint32_t yt_tui_run(yt_tui_t *tui)
         // player refresh
         if (tui->current_view == YT_TUI_VIEW_PLAYER)
         {
-            struct timespec nc_ts;
-            memset(&nc_ts, 0, sizeof(nc_ts));
+            struct timespec nc_ts = LDG_STRUCT_ZERO_INIT;
             clock_gettime(CLOCK_MONOTONIC, &nc_ts);
             uint64_t nc_now = (uint64_t)nc_ts.tv_sec * LDG_NS_PER_SEC + (uint64_t)nc_ts.tv_nsec;
 
             if (got != 0 || nc_now - player_render_ns >= LDG_NS_PER_SEC / 2)
             {
-                tui_render_player(tui);
+                tui_player_render(tui);
 
                 if (tui->render_active) { yt_render_stdout_lock(&tui->render); }
 
@@ -1166,22 +1149,22 @@ uint32_t yt_tui_run(yt_tui_t *tui)
             switch (tui->current_view)
             {
                 case YT_TUI_VIEW_AUTH:
-                    tui_render_auth(tui);
+                    tui_auth_render(tui);
                     break;
 
                 case YT_TUI_VIEW_FEED:
-                    tui_render_feed(tui);
+                    tui_feed_render(tui);
                     break;
 
                 case YT_TUI_VIEW_PLAYER:
                     break;
 
                 case YT_TUI_VIEW_SEARCH:
-                    tui_render_search(tui);
+                    tui_search_render(tui);
                     break;
 
                 case YT_TUI_VIEW_QUEUE:
-                    tui_render_queue(tui);
+                    tui_queue_render(tui);
                     break;
 
                 default:
@@ -1220,7 +1203,7 @@ void yt_tui_shutdown(yt_tui_t *tui)
     if (tui->nc)
     {
         notcurses_stop(tui->nc);
-        tui->nc = NULL;
+        tui->nc = 0x0;
     }
 
     tui_term_reset();

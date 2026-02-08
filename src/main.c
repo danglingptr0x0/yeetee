@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdlib.h>
 #include <locale.h>
 #include <syslog.h>
 
@@ -21,16 +22,16 @@ int main(void)
     openlog("yeetee", LOG_PID | LOG_NDELAY, LOG_USER);
 
     ret = ldg_mem_init();
-    if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return 1; }
+    if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return EXIT_FAILURE; }
 
     ret = yt_conf_init(&conf);
-    if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return 1; }
+    if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return EXIT_FAILURE; }
 
     ret = yt_conf_load(&conf);
-    if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return 1; }
+    if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return EXIT_FAILURE; }
 
     ret = yt_tui_init(&tui, &conf);
-    if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return 1; }
+    if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return EXIT_FAILURE; }
 
     ret = yt_tui_run(&tui);
 
@@ -40,7 +41,7 @@ int main(void)
 
     closelog();
 
-    if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return 1; }
+    if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return EXIT_FAILURE; }
 
     return 0;
 }

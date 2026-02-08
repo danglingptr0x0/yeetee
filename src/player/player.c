@@ -28,8 +28,7 @@ static void* event_loop(void *arg)
             mpv_event_property *prop = (mpv_event_property *)ev->data;
             if (LDG_UNLIKELY(!prop)) { continue; }
 
-            yt_player_event_t pe;
-            memset(&pe, 0, sizeof(pe));
+            yt_player_event_t pe = LDG_STRUCT_ZERO_INIT;
             pe.state = YT_PLAYER_PLAYING;
 
             if (ev->reply_userdata == 1 && prop->format == MPV_FORMAT_DOUBLE) { pe.time_pos = *(double *)prop->data; }
@@ -55,8 +54,7 @@ static void* event_loop(void *arg)
             int32_t err_code = ef ? ef->error : 0;
             syslog(LOG_INFO, "mpv end_file; reason: %u; err: %d", reason, err_code);
 
-            yt_player_event_t pe;
-            memset(&pe, 0, sizeof(pe));
+            yt_player_event_t pe = LDG_STRUCT_ZERO_INIT;
             pe.state = YT_PLAYER_STOPPED;
             pe.eof_reached = 1;
             ldg_spsc_push(&player->event_q, &pe);
@@ -133,7 +131,9 @@ void yt_player_shutdown(yt_player_t *player)
     if (LDG_UNLIKELY(!player)) { return; }
 
     player->running = 0;
-    pthread_join(player->event_thread, 0x0);
+    int join_ret = pthread_join(player->event_thread, 0x0);
+    if (LDG_UNLIKELY(join_ret != 0)) { syslog(LOG_ERR, "player_shutdown; pthread_join failed; ret: %d", join_ret); }
+
     ldg_spsc_shutdown(&player->event_q);
 
     if (player->mpv)
@@ -190,8 +190,7 @@ uint32_t yt_player_seek(yt_player_t *player, double secs)
 
     if (LDG_UNLIKELY(!player->mpv)) { return LDG_ERR_NOT_INIT; }
 
-    char secs_str[32];
-    memset(secs_str, 0, sizeof(secs_str));
+    char secs_str[32] = LDG_ARR_ZERO_INIT;
     snprintf(secs_str, sizeof(secs_str), "%.1f", secs);
 
     const char *cmd[] = { "seek", secs_str, 0x0 };
@@ -220,8 +219,7 @@ uint32_t yt_player_volume_set(yt_player_t *player, uint32_t volume)
 
     if (LDG_UNLIKELY(!player->mpv)) { return LDG_ERR_NOT_INIT; }
 
-    char vol_str[16];
-    memset(vol_str, 0, sizeof(vol_str));
+    char vol_str[16] = LDG_ARR_ZERO_INIT;
     snprintf(vol_str, sizeof(vol_str), "%u", volume);
 
     const char *cmd[] = { "set", "volume", vol_str, 0x0 };

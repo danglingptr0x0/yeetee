@@ -13,15 +13,15 @@
 #include <yeetee/api/innertube.h>
 #include <yeetee/api/json.h>
 
-#define INNERTUBE_BODY_MAX    4096
-#define INNERTUBE_URL_MAX     512
-#define INNERTUBE_HEADER_MAX  2560
-#define INNERTUBE_WEB_UA      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-#define INNERTUBE_TV_UA       "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/2.2 Chrome/63.0.3239.84 TV Safari/537.36"
+#define INNERTUBE_BODY_MAX 4096
+#define INNERTUBE_URL_MAX 512
+#define INNERTUBE_HEADER_MAX 2560
+#define INNERTUBE_WEB_UA "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+#define INNERTUBE_TV_UA "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/2.2 Chrome/63.0.3239.84 TV Safari/537.36"
 
 // innertube
 
-static uint32_t build_innertube_body(const char *param, uint8_t is_search, char *buff, size_t buff_len)
+static uint32_t innertube_body_build(const char *param, uint8_t is_search, char *buff, size_t buff_len)
 {
     int written = 0;
 
@@ -33,25 +33,23 @@ static uint32_t build_innertube_body(const char *param, uint8_t is_search, char 
     return LDG_ERR_AOK;
 }
 
-static uint32_t build_player_body(const char *video_id, char *buff, size_t buff_len)
+static uint32_t innertube_player_body_build(const char *video_id, char *buff, size_t buff_len)
 {
     int written = 0;
 
-    written = snprintf(buff, buff_len, "{\"context\":{\"client\":{\"clientName\":\"%s\","
-        "\"clientVersion\":\"%s\",\"hl\":\"en\",\"gl\":\"US\"}},"
-        "\"videoId\":\"%s\"}", YT_INNERTUBE_TV_CLIENT_NAME, YT_INNERTUBE_TV_CLIENT_VERSION, video_id);
+    written = snprintf(buff, buff_len, "{\"context\":{\"client\":{\"clientName\":\"%s\",""\"clientVersion\":\"%s\",\"hl\":\"en\",\"gl\":\"US\"}},""\"videoId\":\"%s\"}", YT_INNERTUBE_TV_CLIENT_NAME, YT_INNERTUBE_TV_CLIENT_VERSION, video_id);
 
     if (LDG_UNLIKELY(written < 0 || (size_t)written >= buff_len)) { return LDG_ERR_OVERFLOW; }
 
     return LDG_ERR_AOK;
 }
 
-static uint32_t build_innertube_headers(const char *access_token, uint8_t is_web, struct curl_slist **headers_out)
+static uint32_t innertube_headers_build(const char *access_token, uint8_t is_web, struct curl_slist **headers_out)
 {
     uint32_t ret = LDG_ERR_AOK;
     char auth_hdr[INNERTUBE_HEADER_MAX] = LDG_ARR_ZERO_INIT;
 
-    *headers_out = NULL;
+    *headers_out = 0x0;
 
     snprintf(auth_hdr, sizeof(auth_hdr), "Authorization: Bearer %s", access_token);
 
@@ -126,15 +124,15 @@ uint32_t yt_innertube_browse(yt_innertube_ctx_t *ctx, const char *browse_id, yt_
 
     uint32_t ret = LDG_ERR_AOK;
     char body[INNERTUBE_BODY_MAX] = LDG_ARR_ZERO_INIT;
-    struct curl_slist *headers = NULL;
+    struct curl_slist *headers = 0x0;
     ldg_curl_resp_t http_resp = LDG_STRUCT_ZERO_INIT;
 
-    ret = build_innertube_body(browse_id, 0, body, sizeof(body));
+    ret = innertube_body_build(browse_id, 0, body, sizeof(body));
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return ret; }
 
     syslog(LOG_DEBUG, "innertube browse; body: %.256s", body);
 
-    ret = build_innertube_headers(ctx->access_token, 0, &headers);
+    ret = innertube_headers_build(ctx->access_token, 0, &headers);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return ret; }
 
     ldg_curl_resp_init(&http_resp);
@@ -169,13 +167,13 @@ uint32_t yt_innertube_search(yt_innertube_ctx_t *ctx, const char *query, yt_feed
 
     uint32_t ret = LDG_ERR_AOK;
     char body[INNERTUBE_BODY_MAX] = LDG_ARR_ZERO_INIT;
-    struct curl_slist *headers = NULL;
+    struct curl_slist *headers = 0x0;
     ldg_curl_resp_t http_resp = LDG_STRUCT_ZERO_INIT;
 
-    ret = build_innertube_body(query, 1, body, sizeof(body));
+    ret = innertube_body_build(query, 1, body, sizeof(body));
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return ret; }
 
-    ret = build_innertube_headers(ctx->access_token, 0, &headers);
+    ret = innertube_headers_build(ctx->access_token, 0, &headers);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return ret; }
 
     ldg_curl_resp_init(&http_resp);
@@ -205,13 +203,13 @@ uint32_t yt_innertube_player(yt_innertube_ctx_t *ctx, const char *video_id, yt_s
 
     uint32_t ret = LDG_ERR_AOK;
     char body[INNERTUBE_BODY_MAX] = LDG_ARR_ZERO_INIT;
-    struct curl_slist *headers = NULL;
+    struct curl_slist *headers = 0x0;
     ldg_curl_resp_t http_resp = LDG_STRUCT_ZERO_INIT;
 
-    ret = build_player_body(video_id, body, sizeof(body));
+    ret = innertube_player_body_build(video_id, body, sizeof(body));
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return ret; }
 
-    ret = build_innertube_headers(ctx->access_token, 0, &headers);
+    ret = innertube_headers_build(ctx->access_token, 0, &headers);
     if (LDG_UNLIKELY(ret != LDG_ERR_AOK)) { return ret; }
 
     ldg_curl_resp_init(&http_resp);

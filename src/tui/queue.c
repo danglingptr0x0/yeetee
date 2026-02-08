@@ -7,25 +7,25 @@
 #include <notcurses/notcurses.h>
 #include <yeetee/tui/queue.h>
 
-#define YT_QUEUE_FG_TITLE_R  220
-#define YT_QUEUE_FG_TITLE_G  220
-#define YT_QUEUE_FG_TITLE_B  220
+#define YT_QUEUE_FG_TITLE_R 220
+#define YT_QUEUE_FG_TITLE_G 220
+#define YT_QUEUE_FG_TITLE_B 220
 
-#define YT_QUEUE_FG_CHAN_R   0
-#define YT_QUEUE_FG_CHAN_G   180
-#define YT_QUEUE_FG_CHAN_B   180
+#define YT_QUEUE_FG_CHAN_R 0
+#define YT_QUEUE_FG_CHAN_G 180
+#define YT_QUEUE_FG_CHAN_B 180
 
-#define YT_QUEUE_FG_DUR_R    180
-#define YT_QUEUE_FG_DUR_G    180
-#define YT_QUEUE_FG_DUR_B    0
+#define YT_QUEUE_FG_DUR_R 180
+#define YT_QUEUE_FG_DUR_G 180
+#define YT_QUEUE_FG_DUR_B 0
 
-#define YT_QUEUE_BG_SEL_R    30
-#define YT_QUEUE_BG_SEL_G    30
-#define YT_QUEUE_BG_SEL_B    80
+#define YT_QUEUE_BG_SEL_R 30
+#define YT_QUEUE_BG_SEL_G 30
+#define YT_QUEUE_BG_SEL_B 80
 
-#define YT_QUEUE_BG_CUR_R    20
-#define YT_QUEUE_BG_CUR_G    60
-#define YT_QUEUE_BG_CUR_B    20
+#define YT_QUEUE_BG_CUR_R 20
+#define YT_QUEUE_BG_CUR_G 60
+#define YT_QUEUE_BG_CUR_B 20
 
 uint32_t yt_queue_init(yt_queue_t *q)
 {
@@ -67,9 +67,9 @@ uint32_t yt_queue_clear(yt_queue_t *q)
 
 const yt_video_t* yt_queue_current_get(const yt_queue_t *q)
 {
-    if (LDG_UNLIKELY(!q)) { return NULL; }
+    if (LDG_UNLIKELY(!q)) { return 0x0; }
 
-    if (q->current_idx >= q->cunt) { return NULL; }
+    if (q->current_idx >= q->cunt) { return 0x0; }
 
     return &q->items[q->current_idx];
 }
@@ -104,14 +104,9 @@ uint32_t yt_queue_shuffle(yt_queue_t *q)
 
     if (LDG_UNLIKELY(q->cunt < 2)) { return LDG_ERR_AOK; }
 
-    static uint8_t seeded = 0;
-    if (!seeded)
-    {
-        srand((uint32_t)time(NULL));
-        seeded = 1;
-    }
+    srand((uint32_t)time(0x0));
 
-    yt_video_t tmp;
+    yt_video_t tmp = LDG_STRUCT_ZERO_INIT;
     uint32_t i = q->cunt - 1;
     for (; i > 0; i--)
     {
@@ -138,8 +133,6 @@ uint32_t yt_queue_render(yt_queue_t *q, struct ncplane *plane)
     unsigned p_cols = 0;
     ncplane_dim_yx(plane, &p_rows, &p_cols);
     uint32_t rows = (uint32_t)p_rows;
-    uint32_t cols = (uint32_t)p_cols;
-    (void)cols;
 
     uint32_t visible_cunt = rows;
     uint32_t end = q->scroll_offset + visible_cunt;

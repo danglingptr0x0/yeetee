@@ -24,8 +24,7 @@ uint32_t yt_layout_init(yt_layout_t *layout, struct notcurses *nc)
 
     uint32_t content_rows = rows - YT_LAYOUT_HEADER_ROWS - YT_LAYOUT_STATUS_ROWS;
 
-    ncplane_options hdr_opts;
-    memset(&hdr_opts, 0, sizeof(hdr_opts));
+    ncplane_options hdr_opts = LDG_STRUCT_ZERO_INIT;
     hdr_opts.y = 0;
     hdr_opts.x = 0;
     hdr_opts.rows = YT_LAYOUT_HEADER_ROWS;
@@ -34,8 +33,7 @@ uint32_t yt_layout_init(yt_layout_t *layout, struct notcurses *nc)
     layout->header = ncplane_create(stdplane, &hdr_opts);
     if (LDG_UNLIKELY(!layout->header)) { return YT_ERR_TUI_LAYOUT; }
 
-    ncplane_options content_opts;
-    memset(&content_opts, 0, sizeof(content_opts));
+    ncplane_options content_opts = LDG_STRUCT_ZERO_INIT;
     content_opts.y = YT_LAYOUT_HEADER_ROWS;
     content_opts.x = 0;
     content_opts.rows = content_rows;
@@ -49,8 +47,7 @@ uint32_t yt_layout_init(yt_layout_t *layout, struct notcurses *nc)
         return YT_ERR_TUI_LAYOUT;
     }
 
-    ncplane_options status_opts;
-    memset(&status_opts, 0, sizeof(status_opts));
+    ncplane_options status_opts = LDG_STRUCT_ZERO_INIT;
     status_opts.y = (int)(rows - YT_LAYOUT_STATUS_ROWS);
     status_opts.x = 0;
     status_opts.rows = YT_LAYOUT_STATUS_ROWS;

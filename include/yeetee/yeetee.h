@@ -4,17 +4,17 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define YT_VIDEO_ID_MAX       16
-#define YT_VIDEO_TITLE_MAX    256
-#define YT_VIDEO_CHANNEL_MAX  128
-#define YT_VIDEO_THUMB_MAX    512
+#define YT_VIDEO_ID_MAX 16
+#define YT_VIDEO_TITLE_MAX 256
+#define YT_VIDEO_CHANNEL_MAX 128
+#define YT_VIDEO_THUMB_MAX 512
 #define YT_VIDEO_DURATION_MAX 16
 
-#define YT_STREAM_URL_MAX     2048
-#define YT_STREAM_MIME_MAX    64
+#define YT_STREAM_URL_MAX 2048
+#define YT_STREAM_MIME_MAX 64
 
-#define YT_TOKEN_ACCESS_MAX   2048
-#define YT_TOKEN_REFRESH_MAX  512
+#define YT_TOKEN_ACCESS_MAX 2048
+#define YT_TOKEN_REFRESH_MAX 512
 
 typedef struct yt_video
 {
@@ -47,8 +47,8 @@ typedef struct yt_token
     uint64_t expiry_epoch;
 } yt_token_t;
 
-#define YT_FEED_MAX_VIDEOS  64
-#define YT_STREAM_MAX       32
+#define YT_FEED_MAX_VIDEOS 64
+#define YT_STREAM_MAX 32
 
 typedef struct yt_feed
 {

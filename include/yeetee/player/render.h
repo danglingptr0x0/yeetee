@@ -14,7 +14,7 @@ typedef struct yt_render
     struct ncplane *video_plane;
     uint8_t *shm_map[2];
     size_t shm_size;
-    int shm_fd[2];
+    uint32_t shm_fd[2];
     uint32_t pixel_w;
     uint32_t pixel_h;
     size_t stride;

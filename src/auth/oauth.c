@@ -15,11 +15,11 @@
 #include <yeetee/api/json.h>
 
 #define OAUTH_DEVICE_URL "https://oauth2.googleapis.com/device/code"
-#define OAUTH_TOKEN_URL  "https://oauth2.googleapis.com/token"
-#define OAUTH_SCOPE      "https://www.googleapis.com/auth/youtube"
+#define OAUTH_TOKEN_URL "https://oauth2.googleapis.com/token"
+#define OAUTH_SCOPE "https://www.googleapis.com/auth/youtube"
 
-#define OAUTH_BODY_MAX     2048
-#define OAUTH_DEFAULT_MAX  300
+#define OAUTH_BODY_MAX 2048
+#define OAUTH_DEFAULT_MAX 300
 #define OAUTH_SLOWDOWN_ADD 5
 
 // oauth
@@ -34,7 +34,7 @@ uint32_t yt_oauth_device_code_req(ldg_curl_easy_ctx_t *curl, const char *client_
 
     uint32_t ret = LDG_ERR_AOK;
     char body[OAUTH_BODY_MAX] = LDG_ARR_ZERO_INIT;
-    struct curl_slist *headers = NULL;
+    struct curl_slist *headers = 0x0;
     ldg_curl_resp_t http_resp = LDG_STRUCT_ZERO_INIT;
 
     ldg_curl_resp_init(&http_resp);
@@ -73,7 +73,7 @@ uint32_t yt_oauth_poll(ldg_curl_easy_ctx_t *curl, const char *client_id, const c
 
     uint32_t ret = LDG_ERR_AOK;
     char body[OAUTH_BODY_MAX] = LDG_ARR_ZERO_INIT;
-    struct curl_slist *headers = NULL;
+    struct curl_slist *headers = 0x0;
     ldg_curl_resp_t http_resp = LDG_STRUCT_ZERO_INIT;
     uint32_t elapsed = 0;
     uint32_t poll_interval = interval;

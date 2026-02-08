@@ -112,7 +112,7 @@ static uint32_t conf_file_parse(yt_conf_t *conf, int fd)
 
                 line[line_len] = LDG_STR_TERM;
 
-                const char *eq = NULL;
+                const char *eq = 0x0;
                 for (size_t j = 0; j < line_len; j++) { if (line[j] == '=')
                     {
                         eq = &line[j];
@@ -144,7 +144,7 @@ static uint32_t conf_file_parse(yt_conf_t *conf, int fd)
     if (line_len > 0)
     {
         line[line_len] = LDG_STR_TERM;
-        const char *eq = NULL;
+        const char *eq = 0x0;
         for (size_t j = 0; j < line_len; j++) { if (line[j] == '=')
             {
                 eq = &line[j];

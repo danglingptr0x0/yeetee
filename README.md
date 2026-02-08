@@ -1,8 +1,8 @@
 # yeetee
 ## A TUI YouTube client
 
-This is a basic YouTube client with OAuth2 device flow login support. My goal was to make the experience of using it as smooth as possible. The creds configured are well-known "smart TV" creds that anyone can use.
-Currently, the project depends on my private library, though I'm working on getting it done and FLOSS-ing it within the next couple of days (as of Feb 8, 2026).
+This is a basic YouTube client with OAuth2 device flow login support. My goal was to make watching YT in a terminal as smooth as possible. I strongly dislike browsers, but I also watch YouTube, and existing solutions didn't work well for me. The creds configured are well-known "smart TV" creds that anyone can use.
+The project depends on my util lib, available at: [libdangling](https://github.com/danglingptr0x0/libdangling)
 
 Feed:
 
